@@ -58,9 +58,9 @@ class TestMetrics(unittest.TestCase):
                 "mask": "test/data/gnochi_mirror_sq_mask.png",
             },
             "metrics": {
-                'clip': 0.34088701009750366, 
+                'clip': 0.32212701439857483, 
                 'clip_acc': 1.0, 
-                'blipclip': 0.9158170223236084, 
+                'blipclip': 0.9205214381217957, 
                 'blipclip_acc': 1.0, 
                 'dinovitstruct': 0.018216347321867943, 
                 'dinovitstruct_v2': 0.003991228528320789, 

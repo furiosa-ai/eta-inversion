@@ -12,13 +12,13 @@ class BLIPCLIPSimilarity(SimpleMetric):
     https://github.com/yuval-alaluf/Attend-and-Excite/blob/main/metrics/blip_captioning_and_clip_similarity.py
     """
 
-    def __init__(self, input_range: Tuple[int, int]=(-1, 1), device: Optional[str]=None, use_imagenet_templates: bool=True) -> None:
+    def __init__(self, input_range: Tuple[int, int]=(-1, 1), device: Optional[str]=None, use_imagenet_templates: bool=False) -> None:
         """Initializes a new BLIPCLIP similarity metric.
 
         Args:
             input_range (Tuple[int, int], optional): Input range for image tensors needed for normalization. Defaults to (-1, 1).
             device (Optional[str], optional): Device to compute the metric on. Defaults to None.
-            use_imagenet_templates (bool, optional): If True CLIP text embeddings for prompt will be averaged over 80 imagenet templates. Defaults to True.
+            use_imagenet_templates (bool, optional): If True CLIP text embeddings for prompt will be averaged over 80 imagenet templates. Defaults to False.
         """
         super().__init__(input_range, device)
 
@@ -55,7 +55,7 @@ class BLIPCLIPSimilarity(SimpleMetric):
             image = np.clip((self._normalize(image)[0].permute(1, 2, 0)).detach().cpu().numpy() * 255, 0, 255).astype(np.uint8)
 
         # encode prompt
-        prompt_features = get_embedding_for_prompt(self.clip, prompt, templates=imagenet_templates)
+        prompt_features = get_embedding_for_prompt(self.clip, prompt, templates=self.templates)
 
         # extract blip captions and embeddings
         image = Image.fromarray(image)

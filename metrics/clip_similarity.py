@@ -127,13 +127,13 @@ def get_embedding_for_prompt(model: CLIP, prompt: str, templates: List[str]) -> 
 class CLIPSimilarity(SimpleMetric):
     """CLIP similarity for image-text similarity. Ranges from 1 (best) to 0 (worst)."""
 
-    def __init__(self, input_range: Tuple[int, int]=(-1, 1), device: Optional[str]=None, use_imagenet_templates: bool=True) -> None:
+    def __init__(self, input_range: Tuple[int, int]=(-1, 1), device: Optional[str]=None, use_imagenet_templates: bool=False) -> None:
         """Initializes a new CLIP similarity metric.
 
         Args:
             input_range (Tuple[int, int], optional): Input range for image tensors needed for normalization. Defaults to (-1, 1).
             device (Optional[str], optional): Device to compute the metric on. Defaults to None.
-            use_imagenet_templates (bool, optional): If True CLIP text embeddings will be averaged over 80 imagenet templates. Defaults to True.
+            use_imagenet_templates (bool, optional): If True CLIP text embeddings will be averaged over 80 imagenet templates. Defaults to False.
         """
 
         super().__init__(input_range, device)
