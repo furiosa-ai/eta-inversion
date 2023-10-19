@@ -1,0 +1,11 @@
+diffusers==0.21.1
+-e git+https://github.com/openai/CLIP.git@main#egg=clip
+salesforce-lavis
+accelerate
+lpips
+datasets
+torchmetrics
+
+# for notebooks
+ipython
+ipykernel

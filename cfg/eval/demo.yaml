@@ -1,0 +1,10 @@
+data:
+- pie_test3  # full pie dataset has 700 images -> do only 3 images for faster testing
+edit_method:
+- type: simple
+- type: ptp
+method:
+- type: diffinv
+  scheduler: ddim
+- type: npi
+  scheduler: ddim

@@ -1,0 +1,20 @@
+data:
+- pie
+edit_method:
+- type: simple
+- type: ptp
+- type: masactrl
+- type: pnp
+method:
+- type: diffinv
+  scheduler: ddim
+- type: nti
+  scheduler: ddim
+- type: npi
+  scheduler: ddim
+- type: proxnpi
+  scheduler: ddim
+- type: edict
+  scheduler: ddim
+- type: ddpminv
+  scheduler: ddpm

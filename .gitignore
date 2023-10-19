@@ -1,0 +1,10 @@
+__pycache__
+.vscode
+/data/
+result/
+env/
+src/
+*.so
+/*.png
+build
+*.pt
