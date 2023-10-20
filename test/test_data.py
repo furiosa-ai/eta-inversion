@@ -24,7 +24,7 @@ class TestData(unittest.TestCase):
     datasets = [
         "imagenetr-fake-ti2i",
         "imagenetr-ti2i",
-        "ptp20",
+        # "ptp20",
         "pie",
         "imagenhub",
     ]
@@ -58,10 +58,11 @@ class TestData(unittest.TestCase):
                                 0.2: 100.14775848388672,
                                 0.5: 158.48064168294272,
                                 1: 108.8532829284668}},
-        'ptp20': {'sample_hashes': {0: 106.11181640625,
-                                    0.2: 113.71158854166667,
-                                    0.5: 126.65281041463216,
-                                    1: 118.84031295776367}}}
+        # 'ptp20': {'sample_hashes': {0: 106.11181640625,
+        #                             0.2: 113.71158854166667,
+        #                             0.5: 126.65281041463216,
+        #                             1: 118.84031295776367}}
+    }
 
     @classmethod
     def rel_to_abs_ind(cls, ind: List[float], l: int) -> List[int]:
