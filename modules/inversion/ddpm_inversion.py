@@ -34,7 +34,7 @@ class DDPMInversion(DiffusionInversion):
 
         self.forward_seed = forward_seed
 
-    def step_forward(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale_fwd: float, xts: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def predict_step_forward(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale_fwd: float, xts: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Perform one forward diffusion steps. Makes a noise prediction using SD's UNet first and then updates the latent using the noise scheduler.
 
         Args:
@@ -51,7 +51,7 @@ class DDPMInversion(DiffusionInversion):
         guidance_scale_fwd = guidance_scale_fwd or self.guidance_scale_fwd
 
         noise_pred = self.predict_noise(latent, t, context, guidance_scale_fwd, is_fwd=False)
-        res = self.scheduler_fwd.step(noise_pred, t, latent, xts)
+        res = self.step_forward(noise_pred, t, latent, xts)
         latent = res.prev_sample
         variance_noise = res.variance_noise
 
@@ -76,7 +76,7 @@ class DDPMInversion(DiffusionInversion):
             latent = self.scheduler_fwd.get_sampled_latent_by_t(xts, t)
 
             # latent is numerically corrected latent
-            latent, noise_pred, variance_noise = self.step_forward(latent, t, context, guidance_scale_fwd, xts)
+            latent, noise_pred, variance_noise = self.predict_step_forward(latent, t, context, guidance_scale_fwd, xts)
 
             noise_preds.append(noise_pred)
             latents.append(latent)
@@ -121,7 +121,7 @@ class DDPMInversion(DiffusionInversion):
             inv_result = self.skip_inv_result(inv_result)
         return super().sample(inv_result, prompt=prompt, context=context)
 
-    def step_backward(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, eta: float, variance_noise: torch.Tensor, guidance_scale_bwd: Optional[float]=None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def predict_step_backward(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, eta: float, variance_noise: torch.Tensor, guidance_scale_bwd: Optional[float]=None) -> Tuple[torch.Tensor, torch.Tensor]:
         """_summary_
 
         Args:
@@ -138,10 +138,10 @@ class DDPMInversion(DiffusionInversion):
 
         guidance_scale_bwd = guidance_scale_bwd or self.guidance_scale_bwd
 
-        self.controller.begin_step()
+        latent = self.controller.begin_step(latent=latent)
 
         noise_pred = self.predict_noise(latent, t, context, self.guidance_scale_bwd)
-        latent = self.scheduler_bwd.step(noise_pred, t, latent, eta=eta, variance_noise=variance_noise).prev_sample
+        latent = self.step_backward(noise_pred, t, latent, eta=eta, variance_noise=variance_noise).prev_sample
 
         latent = self.controller.end_step(latent=latent)
 
@@ -154,6 +154,6 @@ class DDPMInversion(DiffusionInversion):
 
         # skip timesteps from bwd_skip
         for i, t in enumerate(self.pbar(timesteps, desc="backward")):
-            latent, noise_pred = self.step_backward(latent, t, context, etas[i], variance_noises[i], self.guidance_scale_bwd)
+            latent, noise_pred = self.predict_step_backward(latent, t, context, etas[i], variance_noises[i], self.guidance_scale_bwd)
         
         return latent

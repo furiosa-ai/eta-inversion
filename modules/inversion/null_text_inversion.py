@@ -66,7 +66,7 @@ class NullTextInversion(DiffusionInversion):
             for j in range(num_inner_steps):
                 noise_pred_uncond = self.predict_noise(latent_cur, t, uncond_embeddings, guidance_scale=None)
                 noise_pred = noise_pred_uncond + self.guidance_scale_bwd * (noise_pred_cond - noise_pred_uncond)
-                latents_prev_rec = self.scheduler_bwd.step(noise_pred, t, latent_cur).prev_sample
+                latents_prev_rec = self.step_backward(noise_pred, t, latent_cur).prev_sample
                 loss = nnf.mse_loss(latents_prev_rec, latent_prev)
                 optimizer.zero_grad()
 
@@ -86,14 +86,14 @@ class NullTextInversion(DiffusionInversion):
             uncond_embeddings_list.append(uncond_embeddings[:1].detach())
             with torch.no_grad():
                 context = torch.cat([uncond_embeddings, cond_embeddings])
-                latent_cur, _ = self.step_backward(latent_cur, t, context)
+                latent_cur, _ = self.predict_step_backward(latent_cur, t, context)
         bar.close()
         return uncond_embeddings_list
 
     def diffusion_backward(self, latent: torch.Tensor, context: torch.Tensor, inv_result: Dict[str, Union[List[torch.Tensor], torch.Tensor]]) -> torch.Tensor:
         for i, t in enumerate(self.pbar(self.scheduler_bwd.timesteps, desc="backward")):
             context[:context.shape[0] // 2] = inv_result["uncond_embeddings"][i]  # patch in result from nti (necessary for src and target latent)
-            latent, noise_pred = self.step_backward(latent, t, context)
+            latent, noise_pred = self.predict_step_backward(latent, t, context)
             
         return latent
     

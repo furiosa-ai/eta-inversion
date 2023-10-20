@@ -36,9 +36,10 @@ class PromptToPromptControllerBase(ControllerBase):
         # for debugging
         assert self.step_idx > 0, "Controller begin_step/end_step was not called"
 
-    def begin_step(self, latent: Optional[torch.Tensor]=None, *args, **kwargs) -> None:
+    def begin_step(self, latent: torch.Tensor, *args, **kwargs) -> torch.Tensor:
         # register ptp at the begging of each diffusion step
         ptp_utils.register_attention_control(self.model, self.controller)
+        return latent
 
     def end_step(self, latent: torch.Tensor, noise_pred: Optional[torch.Tensor]=None, t: Optional[int]=None) -> torch.Tensor:
         # update latent using ptp attention controller

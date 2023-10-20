@@ -24,13 +24,16 @@ class ControllerBase:
         """
         pass
 
-    def begin_step(self, latent: Optional[torch.Tensor]=None, *args, **kwargs) -> None:
+    def begin_step(self, latent: torch.Tensor, *args, **kwargs) -> torch.Tensor:
         """Called at the start of a diffusion step
 
         Args:
             latent (Optional[torch.Tensor], optional): Latent before prediction and step. Defaults to None.
+
+        Returns:
+            torch.Tensor: Updated latent
         """
-        pass
+        return latent
 
     def end_step(self, latent: torch.Tensor, noise_pred: Optional[torch.Tensor]=None, t: Optional[int]=None) -> torch.Tensor:
         """Called at the end of a diffusion step. Returns an updated latent.
@@ -97,7 +100,7 @@ class EdictController(ControllerBase):
 
         # execute controller assigned to latent pair
         self.cur_latent_idx = latent_idx
-        self.controllers[self.cur_latent_idx].begin_step()
+        self.controllers[self.cur_latent_idx].begin_step(None)
 
     def end_step(self, latent: torch.Tensor) -> torch.Tensor:
         return self.controllers[self.cur_latent_idx].end_step(latent=latent)

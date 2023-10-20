@@ -290,7 +290,7 @@ class EdictInversion(DiffusionInversion):
         latent_pair = new_latents
         return new_latents
 
-    def step_forward_single(self, latent_idx: int, latent_base: torch.Tensor, latent_model_input: torch.Tensor, 
+    def predict_step_forward_single(self, latent_idx: int, latent_base: torch.Tensor, latent_model_input: torch.Tensor, 
                             t: torch.Tensor, context: torch.Tensor, guidance_scale: float) -> torch.Tensor:
         """Perform a single forward step (noise prediction and scheduler step) for one latent in the latent pair
 
@@ -307,10 +307,10 @@ class EdictInversion(DiffusionInversion):
         """
 
         noise_pred = self.predict_noise(latent_model_input, t, context, guidance_scale, is_fwd=True)
-        new_latent = self.scheduler_fwd.step(noise_pred, t, latent_base).prev_sample
+        new_latent = self.step_forward(noise_pred, t, latent_base).prev_sample
         return new_latent.to(latent_base.dtype)
     
-    def step_backward_single(self, latent_idx: int, latent_base: torch.Tensor, latent_model_input: torch.Tensor, 
+    def predict_step_backward_single(self, latent_idx: int, latent_base: torch.Tensor, latent_model_input: torch.Tensor, 
                              t: torch.Tensor, context: torch.Tensor, guidance_scale: float) -> torch.Tensor:
         """Perform a single backward step (noise prediction and scheduler step) for one latent in the latent pair
 
@@ -330,14 +330,14 @@ class EdictInversion(DiffusionInversion):
         self.controller.begin_step(latent_idx)
 
         noise_pred = self.predict_noise(latent_model_input, t, context, guidance_scale, is_fwd=False)
-        new_latent = self.scheduler_bwd.step(noise_pred, t, latent_base).prev_sample
+        new_latent = self.step_backward(noise_pred, t, latent_base).prev_sample
         new_latent = new_latent.to(latent_base.dtype)
         
         # controller callback
         new_latent = self.controller.end_step(latent=new_latent)
         return new_latent
 
-    def step_forward(self, latent: List[torch.Tensor], t: torch.Tensor, context: torch.Tensor, guidance_scale_fwd: Optional[int]=None) -> Tuple[List[torch.Tensor], None]:
+    def predict_step_forward(self, latent: List[torch.Tensor], t: torch.Tensor, context: torch.Tensor, guidance_scale_fwd: Optional[int]=None) -> Tuple[List[torch.Tensor], None]:
         latent_pair = latent
         guidance_scale_fwd = guidance_scale_fwd or self.guidance_scale_fwd
         i = self.fwd_t_to_i[t.item()]
@@ -347,20 +347,20 @@ class EdictInversion(DiffusionInversion):
 
         for latent_idx, (latent_base, latent_model_input) in self.iter_latent_pair(i, latent_pair, is_fwd=True):
             # iterate over both latents in the pair. order is defined by edict.
-            latent_pair[latent_idx] = self.step_forward_single(latent_idx, latent_base, latent_model_input, t, context, guidance_scale_fwd)
+            latent_pair[latent_idx] = self.predict_step_forward_single(latent_idx, latent_base, latent_model_input, t, context, guidance_scale_fwd)
 
         # print(latent_pair[0].mean().item(), latent_pair[1].mean().item())
 
         return latent_pair, None
 
-    def step_backward(self, latent: List[torch.Tensor], t: torch.Tensor, context: torch.Tensor, guidance_scale_bwd: None=None) -> Tuple[List[torch.Tensor], None]:
+    def predict_step_backward(self, latent: List[torch.Tensor], t: torch.Tensor, context: torch.Tensor, guidance_scale_bwd: None=None) -> Tuple[List[torch.Tensor], None]:
         latent_pair = latent
         guidance_scale_bwd = guidance_scale_bwd or self.guidance_scale_bwd
         i = self.bwd_t_to_i[t.item()]
 
         for latent_idx, (latent_base, latent_model_input) in self.iter_latent_pair(i, latent_pair, is_fwd=False):
             # iterate over both latents in the pair. order is defined by edict.
-            latent_pair[latent_idx] = self.step_backward_single(latent_idx, latent_base, latent_model_input, t, context, guidance_scale_bwd)
+            latent_pair[latent_idx] = self.predict_step_backward_single(latent_idx, latent_base, latent_model_input, t, context, guidance_scale_bwd)
 
         # synchronize latent pair to avoid divergance of latent pair
         latent_pair = self.sync_latent_pair(latent_pair, is_fwd=False)

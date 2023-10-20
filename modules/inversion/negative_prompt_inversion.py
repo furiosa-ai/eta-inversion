@@ -18,7 +18,7 @@ class NegativePromptInversion(DiffusionInversion):
         for i, t in enumerate(self.pbar(self.scheduler_bwd.timesteps, desc="backward")):
             # patch in conditional embeddings for null embeddings (necessary for src and target)
             context[:context.shape[0] // 2] = inv_result["uncond_embeddings"][i]  
-            latent, noise_pred = self.step_backward(latent, t, context)
+            latent, noise_pred = self.predict_step_backward(latent, t, context)
             
         return latent
     

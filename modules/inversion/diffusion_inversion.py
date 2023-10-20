@@ -252,8 +252,9 @@ class DiffusionInversion:
         else:
             # perform cfg
 
-            # duplicate latent at the batch dimension to match uncond and cond embedding in context
-            latent = torch.cat([latent] * 2)
+            # duplicate latent at the batch dimension to match uncond and cond embedding in context for cfg
+            if latent.shape[0] * 2 == context.shape[0]:
+                latent = torch.cat([latent] * 2)
 
             assert latent.shape[0] == context.shape[0]
 
@@ -265,7 +266,13 @@ class DiffusionInversion:
         
         return noise_pred
 
-    def step_forward(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale_fwd: Optional[float]=None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def step_forward(self, noise_pred, t, latent, *args, **kwargs) -> Any:
+        return self.scheduler_fwd.step(noise_pred, t, latent, *args, **kwargs)
+
+    def step_backward(self, noise_pred, t, latent, *args, **kwargs) -> Any:
+        return self.scheduler_bwd.step(noise_pred, t, latent, *args, **kwargs) 
+
+    def predict_step_forward(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale_fwd: Optional[float]=None) -> Tuple[torch.Tensor, torch.Tensor]:
         """Perform one forward diffusion steps. Makes a noise prediction using SD's UNet first and then updates the latent using the noise scheduler.
 
         Args:
@@ -281,20 +288,20 @@ class DiffusionInversion:
         guidance_scale_fwd = guidance_scale_fwd or self.guidance_scale_fwd
 
         # call controller callback (e.g. ptp)
-        self.controller.begin_step(latent=latent)
+        latent = self.controller.begin_step(latent=latent)
 
         # make a noise prediction using UNet
         noise_pred = self.predict_noise(latent, t, context, guidance_scale_fwd, is_fwd=True)
 
         # update the latent based on the predicted noise with the noise schedulers
-        new_latent = self.scheduler_fwd.step(noise_pred, t, latent).prev_sample
+        new_latent = self.step_forward(noise_pred, t, latent).prev_sample
 
         # call controller callback to modify latent (e.g. ptp)
         new_latent = self.controller.end_step(latent=new_latent, noise_pred=noise_pred, t=t)
 
         return new_latent, noise_pred
 
-    def step_backward(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale_bwd: Optional[float]=None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def predict_step_backward(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale_bwd: Optional[float]=None) -> Tuple[torch.Tensor, torch.Tensor]:
         """Perform one backward diffusion steps. Makes a noise prediction using SD's UNet first and then updates the latent using the noise scheduler.
 
         Args:
@@ -310,13 +317,13 @@ class DiffusionInversion:
         guidance_scale_bwd = guidance_scale_bwd or self.guidance_scale_bwd
 
         # call controller callback (e.g. ptp)
-        self.controller.begin_step(latent=latent)
+        latent = self.controller.begin_step(latent=latent, t=t)
 
         # make a noise prediction using UNet
         noise_pred = self.predict_noise(latent, t, context, guidance_scale_bwd)
 
         # update the latent based on the predicted noise with the noise schedulers
-        new_latent = self.scheduler_bwd.step(noise_pred, t, latent).prev_sample
+        new_latent = self.step_backward(noise_pred, t, latent).prev_sample
 
         # call controller callback to modify latent (e.g. ptp)
         new_latent = self.controller.end_step(latent=new_latent, noise_pred=noise_pred, t=t)
@@ -364,7 +371,7 @@ class DiffusionInversion:
 
         for i, t in enumerate(self.pbar(self.get_timesteps_forward(), desc="forward")):
             # iterate over all timesteps and gradually invert latent
-            latent, noise_pred = self.step_forward(latent, t, context, guidance_scale_fwd)
+            latent, noise_pred = self.predict_step_forward(latent, t, context, guidance_scale_fwd)
 
             noise_preds.append(noise_pred)
             latents.append(latent)
@@ -385,7 +392,7 @@ class DiffusionInversion:
 
         for i, t in enumerate(self.pbar(self.get_timesteps_backward(), desc="backward")):
             # iterate over all timesteps and gradually denoise latent
-            latent, noise_pred = self.step_backward(latent, t, context)
+            latent, noise_pred = self.predict_step_backward(latent, t, context)
             
         return latent
 

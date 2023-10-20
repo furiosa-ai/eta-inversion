@@ -40,6 +40,7 @@ def add_argparse_arg(parser: argparse.ArgumentParser, name: str) -> None:
                 "ptp": "Prompt-to-prompt",
                 "masactrl": "MasaControl",
                 "pnp": "Plug-and-play",
+                "pix2pix_zero": "Pix2Pix zero",
         }},
     }
 
