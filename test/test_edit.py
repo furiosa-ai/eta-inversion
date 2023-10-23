@@ -4,6 +4,9 @@ from typing import Any, Callable, Dict
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from utils.debug_utils import enable_deterministic
+# enable_deterministic()
+
 from itertools import product
 import unittest
 
@@ -24,6 +27,7 @@ class TestEdit(unittest.TestCase):
     test_img = "test/data/gnochi_mirror_sq.png"
     test_source_prompt = "a cat sitting next to a mirror"
     test_target_prompt = "a tiger sitting next to a mirror"
+    steps = 50
 
     # additional edit config for ptp
     test_edit_method_configs = { 
@@ -39,12 +43,12 @@ class TestEdit(unittest.TestCase):
 
     # inversion methods to test
     inversion_methods = [
-        dict(type="diffinv", scheduler="ddim", num_inference_steps=50),
-        dict(type="nti", scheduler="ddim", num_inference_steps=50),
-        dict(type="npi", scheduler="ddim", num_inference_steps=50),
-        dict(type="proxnpi", scheduler="ddim", num_inference_steps=50),
-        dict(type="edict", scheduler="ddim", num_inference_steps=50),
-        dict(type="ddpminv", scheduler="ddpm", num_inference_steps=50),
+        dict(type="diffinv", scheduler="ddim", num_inference_steps=steps),
+        dict(type="nti", scheduler="ddim", num_inference_steps=steps),
+        dict(type="npi", scheduler="ddim", num_inference_steps=steps),
+        dict(type="proxnpi", scheduler="ddim", num_inference_steps=steps),
+        dict(type="edict", scheduler="ddim", num_inference_steps=steps),
+        dict(type="ddpminv", scheduler="ddpm", num_inference_steps=steps),
     ]
 
     # edit methods to test
@@ -52,7 +56,8 @@ class TestEdit(unittest.TestCase):
         "simple", 
         "ptp", 
         "masactrl", 
-        "pnp"
+        "pnp",
+        "pix2pix_zero",
     ]
 
     # target means
@@ -62,10 +67,10 @@ class TestEdit(unittest.TestCase):
         "diffinv_ddim_50__ptp": -0.04683445021510124,
         "diffinv_ddim_50__masactrl": -0.05313543975353241,
         "diffinv_ddim_50__pnp": -0.003002788405865431,
-        "nti_ddim_50__simple": -0.02942659519612789,
-        "nti_ddim_50__ptp": -0.04609305411577225,
-        "nti_ddim_50__masactrl": -0.05272071808576584,
-        "nti_ddim_50__pnp": -0.06134377047419548,
+        "nti_ddim_50__simple": -0.029435917735099792,
+        "nti_ddim_50__ptp": -0.046503257006406784,
+        "nti_ddim_50__masactrl": -0.05266636237502098,
+        "nti_ddim_50__pnp": -0.06138245016336441,
         "npi_ddim_50__simple": -0.05262107774615288,
         "npi_ddim_50__ptp": -0.04142343997955322,
         "npi_ddim_50__masactrl": -0.05313543975353241,
@@ -81,11 +86,26 @@ class TestEdit(unittest.TestCase):
         "ddpminv_ddpm_50__ptp": -0.037350550293922424,
         "ddpminv_ddpm_50__masactrl": -0.0204719677567482,
         "ddpminv_ddpm_50__pnp": -0.008612449280917645,
+
+        "diffinv_ddim_50__pix2pix_zero": -0.12201599776744843,
+        "nti_ddim_50__pix2pix_zero": -0.11792322993278503,
+        "npi_ddim_50__pix2pix_zero": -0.12201599776744843,
+        "proxnpi_ddim_50__pix2pix_zero": -0.023641865700483322,
+        "edict_ddim_50__pix2pix_zero": 0.0,
+        "ddpminv_ddpm_50__pix2pix_zero": -0.006461526267230511,
     }
+
+    # TestEdit.test_diffinv_ddim_50__pix2pix_zero_equal TestEdit.test_ddpminv_ddpm_50__pix2pix_zero_equal
+
+    def setUp(self):
+        """Prepare test case
+        """
+
+        # reset seed
+        # enable_deterministic()
 
     @classmethod
     def setUpClass(cls):
-        # enable_deterministic()
         """Load Stable Diffusion model and prepare inversion and editing methods
         """
 
@@ -135,6 +155,8 @@ class TestEdit(unittest.TestCase):
         """
 
         cls.setUpClass()
+
+        print(list(cls.edit_cfgs.keys()))
 
         out = {}
         for test_name, edit_cfg in cls.edit_cfgs.items():
@@ -194,6 +216,8 @@ class TestEdit(unittest.TestCase):
         """
 
         def test_func(self):
+            print("\n", self.id())
+
             edit_res = self.edit_helper(edit_config, image, source_prompt, target_prompt, edit_add_config)
 
             if edit_res is None:
@@ -209,7 +233,7 @@ class TestEdit(unittest.TestCase):
             mean_target = self.test_data.get(test_name, None)
 
             self.assertIsNotNone(mean_target, f"No test data found. Output mean is {torch.mean(edit_image).item()}")
-            self.assert_mean_almost_equal(edit_image, mean_target, places=None if edit_config["inversion"]["type"] != "nti" else 3)
+            self.assert_mean_almost_equal(edit_image, mean_target, places=None if edit_config["inversion"]["type"] not in ("nti",) else 3)
             # self.assert_mean_almost_equal(edit_res["latent"], target_mean)
 
         return test_func

@@ -1,4 +1,7 @@
 
+from utils.debug_utils import enable_deterministic
+enable_deterministic()
+
 from pathlib import Path
 import argparse
 from tqdm import tqdm
@@ -24,7 +27,8 @@ def run_compute_metric(metric: EditMetric, eval_dir: Path, path: str, data: str,
         edit_method (Dict[str, Any]): Editing method
         edit_cfg (Dict[str, Any]): Unused
     """
-
+    
+    enable_deterministic()
     assert str(eval_dir) == str(path)
 
     # store results in metrics/{metric_name}.yaml under the respective result directory

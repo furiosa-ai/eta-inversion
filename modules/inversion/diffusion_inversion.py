@@ -272,10 +272,30 @@ class DiffusionInversion:
         
         return noise_pred
 
-    def step_forward(self, noise_pred, t, latent, *args, **kwargs) -> Any:
+    def step_forward(self, noise_pred: torch.Tensor, t: torch.Tensor, latent: torch.Tensor, *args, **kwargs) -> Any:
+        """Perform a forward step using the forward noise scheduler and predictied noise.
+
+        Args:
+            noise_pred (torch.Tensor): Predicted noise
+            t (torch.Tensor): Timestep
+            latent (torch.Tensor): Current latent
+
+        Returns:
+            Any: Scheduler output containing new latent.
+        """
         return self.scheduler_fwd.step(noise_pred, t, latent, *args, **kwargs)
 
-    def step_backward(self, noise_pred, t, latent, *args, **kwargs) -> Any:
+    def step_backward(self, noise_pred: torch.Tensor, t: torch.Tensor, latent: torch.Tensor, *args, **kwargs) -> Any:
+        """Perform a backward step using the backward noise scheduler and predictied noise.
+
+        Args:
+            noise_pred (torch.Tensor): Predicted noise
+            t (torch.Tensor): Timestep
+            latent (torch.Tensor): Current latent
+
+        Returns:
+            Any: Scheduler output containing new latent.
+        """
         return self.scheduler_bwd.step(noise_pred, t, latent, *args, **kwargs) 
 
     def predict_step_forward(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale_fwd: Optional[float]=None) -> Tuple[torch.Tensor, torch.Tensor]:

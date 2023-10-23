@@ -1,4 +1,7 @@
 
+from utils.debug_utils import enable_deterministic
+enable_deterministic()
+
 from pathlib import Path
 from typing import Optional, Dict, Any
 import cv2
@@ -31,6 +34,7 @@ def run_eval(path: str, data: str, method: Dict[str, Any], edit_method: Dict[str
         edit_cfg (Dict[str, Any]): Unused
     """
 
+    enable_deterministic()
     device = "cuda"
     # metric_name = metric
 

@@ -7,6 +7,33 @@ from PIL import Image
 from modules.models import load_diffusion_model
 
 
+def generate_captions(input_prompt):
+    from transformers import AutoTokenizer, T5ForConditionalGeneration
+
+    tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-xl")
+    model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-xl", device_map="auto", torch_dtype=torch.float16)
+
+    input_ids = tokenizer(input_prompt, return_tensors="pt").input_ids.to("cuda")
+
+    outputs = model.generate(
+        input_ids, temperature=0.8, num_return_sequences=16, do_sample=True, max_new_tokens=128, top_k=10
+    )
+    return tokenizer.batch_decode(outputs, skip_special_tokens=True)
+
+
+def generate_source_target_prompts():
+    source_concept = "cat"
+    target_concept = "dog"
+
+    source_text = f"Provide a caption for images containing a {source_concept}. "
+    "The captions should be in English and should be no longer than 150 characters."
+
+    target_text = f"Provide a caption for images containing a {target_concept}. "
+    "The captions should be in English and should be no longer than 150 characters."
+
+    return generate_captions(source_text), generate_captions(target_text)
+
+
 def main2():
     captioner_id = "Salesforce/blip-image-captioning-base"
     processor = BlipProcessor.from_pretrained(captioner_id)
@@ -54,8 +81,9 @@ def main2():
 
     # See the "Generating source and target embeddings" section below to
     # automate the generation of these captions with a pre-trained model like Flan-T5 as explained below.
-    source_prompts = ["a cat sitting on the street", "a cat playing in the field", "a face of a cat"]
-    target_prompts = ["a dog sitting on the street", "a dog playing in the field", "a face of a dog"]
+    # source_prompts = ["a cat sitting on the street", "a cat playing in the field", "a face of a cat"]
+    # target_prompts = ["a dog sitting on the street", "a dog playing in the field", "a face of a dog"]
+    source_prompts, target_prompts = generate_source_target_prompts()
 
     # source_prompts = ["a cat sitting on the street"]
     # target_prompts = ["a dog sitting on the street"]

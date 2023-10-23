@@ -3,6 +3,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from utils.debug_utils import enable_deterministic
+enable_deterministic()
+
 import unittest
 
 import torch
@@ -38,13 +41,21 @@ class TestInv(unittest.TestCase):
     # target means
     test_data = {
         "diffinv_ddim_50": -0.00339360604993999,
-        "nti_ddim_50": -0.005136154592037201,
+        "nti_ddim_50": -0.005136287771165371,
         "npi_ddim_50": -0.008206233382225037,
         "proxnpi_ddim_50": -0.008206233382225037,
         "edict_ddim_50": -0.0074141742661595345,
         "ddpminv_ddpm_50": -0.011976341716945171
     }
 
+    @classmethod
+    def setUp(cls):
+        """Prepare test case
+        """
+
+        # reset seed
+        enable_deterministic()
+    
     @classmethod
     def setUpClass(cls):
         """Load Stable Diffusion model and prepare inversion methods

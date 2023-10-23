@@ -118,16 +118,19 @@ class ProximalNegativePromptInversion(NegativePromptInversion):
 
         return noise_pred
 
-    def predict_noise(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale: Union[float, int], is_fwd: bool=False) -> torch.Tensor:
+    def predict_noise(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale: Union[float, int], is_fwd: bool=False, **kwargs) -> torch.Tensor:
         if guidance_scale is None:
-            noise_pred = self.model.unet(latent, t, encoder_hidden_states=context)["sample"] 
+            noise_pred = self.unet(latent, t, encoder_hidden_states=context, **kwargs)["sample"] 
         else:
             # cfg
-            latent = torch.cat([latent] * 2)
+            
+            # duplicate latent at the batch dimension to match uncond and cond embedding in context for cfg
+            if latent.shape[0] * 2 == context.shape[0]:
+                latent = torch.cat([latent] * 2)
+            else:
+                assert latent.shape[0] == context.shape[0]
 
-            assert latent.shape[0] == context.shape[0]
-
-            noise_pred = self.model.unet(latent, t, encoder_hidden_states=context)["sample"]
+            noise_pred = self.unet(latent, t, encoder_hidden_states=context, **kwargs)["sample"]
             noise_pred_uncond, noise_prediction_text = noise_pred.chunk(2)
 
             if not is_fwd:

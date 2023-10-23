@@ -1,4 +1,7 @@
 
+from utils.debug_utils import enable_deterministic
+enable_deterministic()
+
 import torch
 from pathlib import Path
 import cv2
@@ -59,6 +62,8 @@ def get_edit_word(source_prompt: str, target_prompt: str) -> Tuple[str, str]:
 @torch.no_grad()
 def main(input: str, src_prompt: str, target_prompt: str, output: str, inv_method: str, edit_method: str, 
          scheduler: str, steps: int, guidance_scale_bwd: float, guidance_scale_fwd: float, edit_cfg: str) -> None:
+    enable_deterministic()
+
     input = Path(input)
 
     if output is None:

@@ -1,10 +1,12 @@
 from collections import OrderedDict
-import torch
 import numpy as np
 import random
+import os
 
 
 def _to_str(x):
+    import torch
+
     if isinstance(x, list):
         return "[" + ", ".join(_to_str(v) for v in x) + "]"
     elif isinstance(x, tuple):
@@ -37,7 +39,11 @@ def log_func_inputs(f):
 def enable_deterministic():
     """Does not work for every operator like backwards in NTI
     """
-    torch.use_deterministic_algorithms(True)
+
+    os.environ["CUBLAS_WORKSPACE_CONFIG"]=":4096:8"
+
+    import torch
+    torch.use_deterministic_algorithms(True, warn_only=True)
     torch.backends.cudnn.benchmark = False
 
     torch.manual_seed(0)

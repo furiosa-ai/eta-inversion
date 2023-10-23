@@ -1,4 +1,7 @@
 
+from utils.debug_utils import enable_deterministic
+enable_deterministic()
+
 from pathlib import Path
 import cv2
 import torch
@@ -13,6 +16,8 @@ from utils.utils import add_argparse_arg
 
 @torch.no_grad()
 def main(input: str, prompt: str, output: str, method: str, scheduler: str, steps: int, guidance_scale_bwd: float, guidance_scale_fwd: float) -> None:
+    enable_deterministic()
+
     input = Path(input)
 
     if output is None:

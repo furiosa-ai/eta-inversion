@@ -196,14 +196,21 @@ def text2image_ldm_stable(
 def register_attention_control(model: StableDiffusionPipeline, controller: Optional[AttentionReweight], source_latents: None=None) -> None:
     # source_latents from 0 to T
 
-    def ca_forward(self, place_in_unet):
-        to_out = self.to_out
-        if type(to_out) is torch.nn.modules.container.ModuleList:
-            to_out = self.to_out[0]
-        else:
-            to_out = self.to_out
+    class CAForward:
+        def __init__(self, net, place_in_unet):
+            self.net = net
+            self.place_in_unet = place_in_unet
+            self.old_forward = net.forward  # store old function to restore later
 
-        def forward(x, encoder_hidden_states=None, attention_mask=None, context=None, mask=None):
+        def __call__(self, x, encoder_hidden_states=None, attention_mask=None, context=None, mask=None):
+            place_in_unet = self.place_in_unet
+            self = self.net
+
+            to_out = self.to_out
+            if type(to_out) is torch.nn.modules.container.ModuleList:
+                to_out = self.to_out[0]
+            else:
+                to_out = self.to_out
 
             # for different diffuser versions
             if encoder_hidden_states is not None:
@@ -251,16 +258,14 @@ def register_attention_control(model: StableDiffusionPipeline, controller: Optio
                 out = self.batch_to_head_dim(out)
 
             return to_out(out)
+        
+    # class DummyController:
 
-        return forward
+    #     def __call__(self, *args):
+    #         return args[0]
 
-    class DummyController:
-
-        def __call__(self, *args):
-            return args[0]
-
-        def __init__(self):
-            self.num_att_layers = 0
+    #     def __init__(self):
+    #         self.num_att_layers = 0
 
     if controller is not None:
         # override unet forward to ptp forward
@@ -269,13 +274,12 @@ def register_attention_control(model: StableDiffusionPipeline, controller: Optio
         # reset to original unet forward if controller is None
         model.unet.forward = model.unet.forward.unet_forward
 
-    if controller is None:
-        controller = DummyController()
-
     def register_recr(net_, count, place_in_unet):
         if net_.__class__.__name__ in ('Attention', 'CrossAttention'):
-        # if net_.__class__.__name__ == 'CrossAttention':
-            net_.forward = ca_forward(net_, place_in_unet)
+            if controller is not None:
+                net_.forward = CAForward(net_, place_in_unet)
+            else:
+                net_.forward = net_.forward.old_forward
             return count + 1
         elif hasattr(net_, 'children'):
             for net__ in net_.children():
@@ -293,7 +297,9 @@ def register_attention_control(model: StableDiffusionPipeline, controller: Optio
             cross_att_count += register_recr(net[1], 0, "mid")
 
     assert cross_att_count == 32, "verify correct diffusers version and that model is SD"
-    controller.num_att_layers = cross_att_count
+
+    if controller is not None:
+        controller.num_att_layers = cross_att_count
 
     
 def get_word_inds(text: str, word_place: int, tokenizer: CLIPTokenizer) -> ndarray:
