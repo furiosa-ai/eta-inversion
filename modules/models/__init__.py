@@ -119,8 +119,7 @@ def load_diffusion_model(model: str="CompVis/stable-diffusion-v1-4", device: str
 
     if model in ("CompVis/stable-diffusion-v1-4",):
         scheduler = DDIMScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", clip_sample=False, set_alpha_to_one=False)
-        MY_TOKEN = ''
-        model = StableDiffusionPipeline.from_pretrained(model, use_auth_token=MY_TOKEN, scheduler=scheduler).to(device)
+        model = StableDiffusionPipeline.from_pretrained(model, scheduler=scheduler).to(device)
         return model, (StablePreprocess(device, size=512, **(preproc_args if preproc_args is not None else {})), StablePostProc())
     else:
         raise Exception(model)

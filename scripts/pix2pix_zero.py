@@ -4,23 +4,44 @@ from diffusers import DDIMScheduler, DDIMInverseScheduler, StableDiffusionPix2Pi
 import requests
 from PIL import Image
 
+from modules.models import load_diffusion_model
+
 
 def main2():
     captioner_id = "Salesforce/blip-image-captioning-base"
     processor = BlipProcessor.from_pretrained(captioner_id)
-    model = BlipForConditionalGeneration.from_pretrained(captioner_id, torch_dtype=torch.float16, low_cpu_mem_usage=True)
+    model = BlipForConditionalGeneration.from_pretrained(captioner_id, torch_dtype=torch.float16, low_cpu_mem_usage=True).cuda()
 
     sd_model_ckpt = "CompVis/stable-diffusion-v1-4"
     pipeline = StableDiffusionPix2PixZeroPipeline.from_pretrained(
         sd_model_ckpt,
         caption_generator=model,
         caption_processor=processor,
-        torch_dtype=torch.float16,
+        # torch_dtype=torch.float16,
         safety_checker=None,
-    )
-    pipeline.scheduler = DDIMScheduler.from_config(pipeline.scheduler.config)
+    ).to("cuda")
+
+
+    # pipeline_patch = load_diffusion_model()[0]
+
+    # # pipeline.vae=pipeline_patch.vae
+    # pipeline.text_encoder=pipeline_patch.text_encoder
+    # pipeline.tokenizer=pipeline_patch.tokenizer
+    # pipeline.unet=pipeline_patch.unet
+    # pipeline.scheduler=pipeline_patch.scheduler
+    # pipeline.safety_checker=pipeline_patch.safety_checker
+    # pipeline.feature_extractor=pipeline_patch.feature_extractor
+    # pipeline.scheduler=pipeline_patch.scheduler
+    # del pipeline_patch
+
+    # pipeline.scheduler = DDIMScheduler.from_config(pipeline.scheduler.config)
+    scheduler_kwargs = {
+        "clip_sample": False,
+        "set_alpha_to_one": False,
+        }
+    pipeline.scheduler = DDIMScheduler.from_config({**pipeline.scheduler.config, **scheduler_kwargs})
     pipeline.inverse_scheduler = DDIMInverseScheduler.from_config(pipeline.scheduler.config)
-    pipeline.enable_model_cpu_offload()
+    # pipeline.enable_model_cpu_offload()
 
     img_url = "https://github.com/pix2pixzero/pix2pix-zero/raw/main/assets/test_images/cats/cat_6.png"
     raw_image = Image.open(requests.get(img_url, stream=True).raw).convert("RGB").resize((512, 512))
@@ -33,15 +54,25 @@ def main2():
 
     # See the "Generating source and target embeddings" section below to
     # automate the generation of these captions with a pre-trained model like Flan-T5 as explained below.
-    # source_prompts = ["a cat sitting on the street", "a cat playing in the field", "a face of a cat"]
-    # target_prompts = ["a dog sitting on the street", "a dog playing in the field", "a face of a dog"]
+    source_prompts = ["a cat sitting on the street", "a cat playing in the field", "a face of a cat"]
+    target_prompts = ["a dog sitting on the street", "a dog playing in the field", "a face of a dog"]
 
-    source_prompts = ["a cat sitting on the street"]
-    target_prompts = ["a dog sitting on the street"]
+    # source_prompts = ["a cat sitting on the street"]
+    # target_prompts = ["a dog sitting on the street"]
 
     source_embeds = pipeline.get_embeds(source_prompts, batch_size=2)
     target_embeds = pipeline.get_embeds(target_prompts, batch_size=2)
 
+    import pickle
+    with open("dump.pkl", "rb") as f:
+        dump = pickle.load(f)
+
+    print(caption)
+    print("inv_latents", torch.mean(inv_latents).item())
+    print("source_embeds", torch.mean(source_embeds).item())
+    print("target_embeds", torch.mean(target_embeds).item())
+
+    inv_latents = dump["latents"][-1]
 
     image = pipeline(
         caption,

@@ -35,6 +35,7 @@ class DiffusionInversion:
         self.guidance_scale_fwd = guidance_scale_fwd or 1
 
         self.model = model
+        self.unet = model.unet
         self.device = self.model.device
         self.verbose = verbose
         self.controller = None
@@ -215,12 +216,6 @@ class DiffusionInversion:
             torch.Tensor: Context for SD's UNet. Unconditional and conditional embedding concated at the batch dim.
         """
 
-        # tokenize and embed negative prompt
-        uncond_input = self.model.tokenizer(
-            [negative_prompt], padding="max_length", max_length=self.model.tokenizer.model_max_length, return_tensors="pt"
-        )
-        uncond_embeddings = self.model.text_encoder(uncond_input.input_ids.to(self.model.device))[0]
-
         # tokenize and embed prompt
         text_input = self.model.tokenizer(
             [prompt],
@@ -230,10 +225,21 @@ class DiffusionInversion:
             return_tensors="pt"
         )
         text_embeddings = self.model.text_encoder(text_input.input_ids.to(self.model.device))[0]
-        context = torch.cat([uncond_embeddings, text_embeddings])
+
+        if negative_prompt is not None:
+            # tokenize and embed negative prompt
+            uncond_input = self.model.tokenizer(
+                [negative_prompt], padding="max_length", max_length=self.model.tokenizer.model_max_length, return_tensors="pt"
+            )
+            uncond_embeddings = self.model.text_encoder(uncond_input.input_ids.to(self.model.device))[0]
+
+            context = torch.cat([uncond_embeddings, text_embeddings])
+        else:
+            context = text_embeddings
+
         return context
     
-    def predict_noise(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale: Optional[Union[float, int]], is_fwd: bool=False) -> torch.Tensor:
+    def predict_noise(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale: Optional[Union[float, int]], is_fwd: bool=False,  **kwargs) -> torch.Tensor:
         """Make a noise prediction at timestep t using the diffusion model with classifier-free guidance.
 
         Args:
@@ -248,17 +254,17 @@ class DiffusionInversion:
         """
 
         if guidance_scale is None:
-            noise_pred = self.model.unet(latent, t, encoder_hidden_states=context)["sample"] 
+            noise_pred = self.unet(latent, t, encoder_hidden_states=context, **kwargs)["sample"] 
         else:
             # perform cfg
 
             # duplicate latent at the batch dimension to match uncond and cond embedding in context for cfg
             if latent.shape[0] * 2 == context.shape[0]:
                 latent = torch.cat([latent] * 2)
+            else:
+                assert latent.shape[0] == context.shape[0]
 
-            assert latent.shape[0] == context.shape[0]
-
-            noise_pred = self.model.unet(latent, t, encoder_hidden_states=context)["sample"]
+            noise_pred = self.unet(latent, t, encoder_hidden_states=context, **kwargs)["sample"]
 
             # cfg
             noise_pred_uncond, noise_prediction_text = noise_pred.chunk(2)

@@ -3,7 +3,7 @@ import contextlib
 from .editor import Editor
 import torch
 import numpy as np
-from typing import Dict, Iterator, Optional, Any
+from typing import Dict, Iterator, Optional, Any, Union
 from modules.inversion.diffusion_inversion import DiffusionInversion
 
 from transformers import BlipForConditionalGeneration, BlipProcessor
@@ -15,34 +15,146 @@ from .controller import ControllerBase
 import inspect
 
 
-class _FunctionInject:
-    def __init__(self, func, before, after) -> None:
-        self.func = func
-        self.before = before
-        self.after = after
+# class FunctionInject:
+#     def __init__(self, obj, func_name, before, after) -> None:
+#         self.obj = obj
+#         self.func_name = func_name
+#         self.func = getattr(obj, func_name)
+#         self.before = before
+#         self.after = after
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        if self.before is not None:
-            out_pre = self.before(*args, **kwargs)
-            out_func = self.func(*out_pre)
-        else:
-            out_func = self.func(**args, **kwargs)
+#     def begin(self):
+#         setattr(self.obj, self.func_name, self.inject)
 
-        if self.after is not None:
-            out_post = self.after(out_func)
-        else:
-            out_post = out_func
+#     def end(self):
+#         setattr(self.obj, self.func_name, self.func)
 
-        return out_post
+#     def inject(self, *args: Any, **kwargs: Any) -> Any:
+#         if self.before is not None:
+#             out_pre = self.before(*args, **kwargs)
+#             self.end()
+#             out_func = self.func(*out_pre)
+#         else:
+#             self.end()
+#             out_func = self.func(*args, **kwargs)
+
+#         self.begin()
+
+#         if self.after is not None:
+#             out_post = self.after(out_func)
+#         else:
+#             out_post = out_func
+
+#         return out_post
 
 
-@contextlib.contextmanager
-def inject_function(obj, func_name, before=None, after=None):
-    func = getattr(obj, func_name)
-    inj = _FunctionInject(func, before, after)
-    setattr(obj, func_name, inj)
-    yield
-    setattr(obj, func_name, inj.func)
+class FunctionInject:
+    def __init__(self, obj, func_name, func_new) -> None:
+        self.obj = obj
+        self.func_name = func_name
+        self.func_old = getattr(obj, func_name)
+        self.func_new = func_new
+
+    def begin(self):
+        setattr(self.obj, self.func_name, self.inject)
+
+    def end(self):
+        setattr(self.obj, self.func_name, self.func_old)
+
+    def inject(self, *args: Any, **kwargs: Any) -> Any:
+        self.end()
+        out = self.func_new(*args, **kwargs)
+        self.begin()
+        return out
+    
+
+class Injector:
+    def __init__(self, inverter) -> None:
+        self.inverter = inverter
+        self.injectable_functions = ["unet", "predict_noise", "step_backward"]
+        self.injectors = {}
+
+    def __enter__(self):
+        self.begin()
+        return self
+    
+    def __exit__(self ,type, value, traceback):
+        self.end()
+
+    def begin(self):
+        assert len(self.injectors) == 0
+        for func_name in self.injectable_functions:
+            if hasattr(self, func_name):
+                inj = FunctionInject(self.inverter, func_name, getattr(self, func_name))
+                inj.begin()
+                self.injectors[func_name] = inj
+
+    def end(self):
+        for inj in reversed(self.injectors.values()):
+            inj.end()
+
+        self.injectors = {}
+
+
+class Pix2PixZeroInjectorSource(Injector):
+    def __init__(self, inverter) -> None:
+        super().__init__(inverter)
+
+    def unet(self, latent, t, encoder_hidden_states):
+        return self.inverter.unet(latent, t, encoder_hidden_states, cross_attention_kwargs={"timestep": t})
+
+
+class Pix2PixZeroInjectorTarget(Injector):
+    def __init__(self, inverter) -> None:
+        super().__init__(inverter)
+
+        self.x_in = None
+        self.cross_attention_guidance_amount = 0.15
+
+    def predict_noise(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale: Optional[Union[float, int]], is_fwd: bool=False, **kwargs) -> torch.Tensor:
+        assert latent.shape[0] == 1 and not is_fwd
+
+        x_in = latent.detach().clone()
+        x_in = torch.cat([latent] * 2)  # cfg
+        x_in.requires_grad = True
+
+        # optimizer
+        opt = torch.optim.SGD([x_in], lr=self.cross_attention_guidance_amount)
+
+        with torch.enable_grad():
+            # initialize loss
+            loss = Pix2PixZeroL2Loss()
+
+            # predict the noise residual
+            noise_pred = self.inverter.unet(
+                x_in,
+                t,
+                encoder_hidden_states=context,
+                cross_attention_kwargs={"timestep": t, "loss": loss},
+            ).sample
+
+            loss.loss.backward(retain_graph=False)
+            opt.step()
+
+            print("noise_pred_1", torch.mean(noise_pred).item())
+            print("loss", loss.loss.item())
+
+        noise_pred = self.inverter.predict_noise(x_in.detach(), t, context, guidance_scale, is_fwd, cross_attention_kwargs={"timestep": None}, **kwargs)
+        self.x_in = x_in
+
+        print("x_in", torch.mean(x_in).item())
+        print("encoder_hidden_states", torch.mean(context).item())
+
+        return noise_pred
+    
+    def step_backward(self, noise_pred, t, latent, *args, **kwargs) -> Any:
+        latent = self.x_in.detach().chunk(2)[0]
+        self.x_in = None
+
+        print("noise_pred", torch.mean(noise_pred).item())
+        print("latent", torch.mean(latent).item())
+
+        return self.inverter.step_backward(noise_pred, t, latent, *args, **kwargs) 
 
 
 class Pix2PixZeroAttnProcessor:
@@ -53,7 +165,6 @@ class Pix2PixZeroAttnProcessor:
         self.is_pix2pix_zero = is_pix2pix_zero
         if self.is_pix2pix_zero:
             self.reference_cross_attn_map = {}
-        self.timestep = None
 
     def __call__(
         self,
@@ -64,9 +175,6 @@ class Pix2PixZeroAttnProcessor:
         timestep=None,
         loss=None,
     ):
-        if timestep is not None:
-            self.timestep = timestep
-
         batch_size, sequence_length, _ = hidden_states.shape
         attention_mask = attn.prepare_attention_mask(attention_mask, sequence_length, batch_size)
         query = attn.to_q(hidden_states)
@@ -85,13 +193,13 @@ class Pix2PixZeroAttnProcessor:
 
         attention_probs = attn.get_attention_scores(query, key, attention_mask)
 
-        if self.is_pix2pix_zero and self.timestep is not None:
+        if self.is_pix2pix_zero and timestep is not None:
             # new bookkeeping to save the attention weights.
             if loss is None:
-                self.reference_cross_attn_map[self.timestep.item()] = attention_probs.detach().cpu()
+                self.reference_cross_attn_map[timestep.item()] = attention_probs.detach().cpu()
             # compute loss
             elif loss is not None:
-                prev_attn_probs = self.reference_cross_attn_map.pop(self.timestep.item())
+                prev_attn_probs = self.reference_cross_attn_map.pop(timestep.item())
                 loss.compute_loss(attention_probs, prev_attn_probs.to(attention_probs.device))
         else:
             pass
@@ -184,17 +292,6 @@ class Pix2PixZeroController(ControllerBase):
             return latent
 
 
-class Pix2PixZeroInject:
-    def __init__(self, inverter) -> None:
-        pass
-
-    def step_forward(self, noise_pred, t, latent, *args, **kwargs) -> Any:
-        return self.scheduler_fwd.step(noise_pred, t, latent, *args, **kwargs)
-
-    def step_backward(self, noise_pred, t, latent, *args, **kwargs) -> Any:
-        return self.scheduler_bwd.step(noise_pred, t, latent, *args, **kwargs) 
-
-
 class Pix2PixZeroEditor(Editor):
     """MasaControl editor
     """
@@ -217,7 +314,8 @@ class Pix2PixZeroEditor(Editor):
         if self.gen_caption:
             captioner_id = "Salesforce/blip-image-captioning-base"
             self.caption_processor = BlipProcessor.from_pretrained(captioner_id)
-            self.caption_generator = BlipForConditionalGeneration.from_pretrained(captioner_id, torch_dtype=torch.float16, low_cpu_mem_usage=True)
+            self.caption_generator = BlipForConditionalGeneration.from_pretrained(
+                captioner_id, torch_dtype=torch.float16, low_cpu_mem_usage=True).to(self.model.device)
 
     def construct_direction(self, embs_source: torch.Tensor, embs_target: torch.Tensor):
         """Constructs the edit direction to steer the image generation process semantically."""
@@ -256,29 +354,40 @@ class Pix2PixZeroEditor(Editor):
             # caption = source_prompt
 
         # create context from prompts
-        context = self.inverter.create_context(caption, negative_prompt=caption)
-        src_context = self.inverter.create_context(source_prompt)
-        target_context = self.inverter.create_context(target_prompt)
+        src_context = self.inverter.create_context(source_prompt, None)
+        target_context = self.inverter.create_context(target_prompt, None)
 
         # diffusion inversion with the source prompt to obtain inverse latent zT
 
         attn_procs = prepare_unet(self.model.unet)
 
         # with self.inverter.use_controller(Pix2PixZeroController(self.model, context_edit, attn_procs, mode="forward")):
-        inv_res = self.inverter.invert(image, context=src_context, guidance_scale_fwd=1)
+        inv_res = self.inverter.invert(image, context=torch.cat([src_context] * 2), guidance_scale_fwd=1)
 
         # store attention maps from source backward
         # with self.inverter.use_controller(Pix2PixZeroController(self.model, None, attn_procs, mode="backward_source")):
 
-        # with inject_function(self.inverter, "")
-        _ = self.inverter.sample(inv_res, context=[src_context])
+        context = self.inverter.create_context(caption, negative_prompt=caption)
+        with Pix2PixZeroInjectorSource(self.inverter):
+            _ = self.inverter.sample(inv_res, context=context)
 
         edit_direction = self.construct_direction(src_context, target_context).to(self.model.device)
         context_edit = context.clone()
         context_edit[1:2] += edit_direction
 
-        with self.inverter.use_controller(Pix2PixZeroController(self.model, context_edit, attn_procs, mode="backward_target")):
-            edit_res = self.inverter.sample(inv_res, context=[context_edit])
+        import pickle
+        with open("dump.pkl", "wb") as f:
+            pickle.dump({**inv_res, "context_edit": context_edit}, f)
+
+        # with self.inverter.use_controller(Pix2PixZeroController(self.model, context_edit, attn_procs, mode="backward_target")):
+
+        print(caption)
+        print("inv_latents", torch.mean(inv_res["latents"][-1]).item())
+        print("source_embeds", torch.mean(src_context).item())
+        print("target_embeds", torch.mean(target_context).item())
+
+        with Pix2PixZeroInjectorTarget(self.inverter):
+            edit_res = self.inverter.sample(inv_res, context=context_edit)
 
         # TODO: unprepare unet
 
