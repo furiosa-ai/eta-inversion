@@ -28,7 +28,7 @@ class ControllerBase:
         """Called at the start of a diffusion step
 
         Args:
-            latent (Optional[torch.Tensor], optional): Latent before prediction and step. Defaults to None.
+            latent torch.Tensor: Latent before prediction and step. Defaults to None.
 
         Returns:
             torch.Tensor: Updated latent

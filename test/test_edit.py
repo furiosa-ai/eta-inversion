@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.debug_utils import enable_deterministic
-# enable_deterministic()
+enable_deterministic()
 
 from itertools import product
 import unittest
@@ -64,35 +64,33 @@ class TestEdit(unittest.TestCase):
     # test functions will be named: test_{key}_equal
     test_data = {
         "diffinv_ddim_50__simple": -0.06234968826174736,
-        "diffinv_ddim_50__ptp": -0.04683445021510124,
-        "diffinv_ddim_50__masactrl": -0.05313543975353241,
-        "diffinv_ddim_50__pnp": -0.003002788405865431,
+        "diffinv_ddim_50__ptp": -0.04683462902903557,
+        "diffinv_ddim_50__masactrl": -0.053135693073272705,
+        "diffinv_ddim_50__pnp": -0.0030027353204786777,
+        "diffinv_ddim_50__pix2pix_zero": -0.12201599776744843,
         "nti_ddim_50__simple": -0.029435917735099792,
         "nti_ddim_50__ptp": -0.046503257006406784,
-        "nti_ddim_50__masactrl": -0.05266636237502098,
-        "nti_ddim_50__pnp": -0.06138245016336441,
-        "npi_ddim_50__simple": -0.05262107774615288,
-        "npi_ddim_50__ptp": -0.04142343997955322,
-        "npi_ddim_50__masactrl": -0.05313543975353241,
-        "npi_ddim_50__pnp": -0.06164669245481491,
-        "proxnpi_ddim_50__simple": -0.04679223150014877,
-        "proxnpi_ddim_50__ptp": -0.0418790727853775,
-        "proxnpi_ddim_50__masactrl": -0.03455955907702446,
-        "proxnpi_ddim_50__pnp": -0.031405117362737656,
-        "edict_ddim_50__simple": -0.015604748390614986,
-        "edict_ddim_50__ptp": -0.020958151668310165,
-        "edict_ddim_50__masactrl": -0.012362945824861526,
-        "ddpminv_ddpm_50__simple": -0.022691426798701286,
-        "ddpminv_ddpm_50__ptp": -0.037350550293922424,
-        "ddpminv_ddpm_50__masactrl": -0.0204719677567482,
-        "ddpminv_ddpm_50__pnp": -0.008612449280917645,
-
-        "diffinv_ddim_50__pix2pix_zero": -0.12201599776744843,
+        "nti_ddim_50__masactrl": -0.05268318951129913,
+        "nti_ddim_50__pnp": -0.06137224659323692,
         "nti_ddim_50__pix2pix_zero": -0.11792322993278503,
+        "npi_ddim_50__simple": -0.05262122303247452,
+        "npi_ddim_50__ptp": -0.04142346978187561,
+        "npi_ddim_50__masactrl": -0.053135693073272705,
+        "npi_ddim_50__pnp": -0.06164667010307312,
         "npi_ddim_50__pix2pix_zero": -0.12201599776744843,
+        "proxnpi_ddim_50__simple": -0.0467924103140831,
+        "proxnpi_ddim_50__ptp": -0.041878968477249146,
+        "proxnpi_ddim_50__masactrl": -0.03455960750579834,
+        "proxnpi_ddim_50__pnp": -0.03140567988157272,
         "proxnpi_ddim_50__pix2pix_zero": -0.023641865700483322,
-        "edict_ddim_50__pix2pix_zero": 0.0,
-        "ddpminv_ddpm_50__pix2pix_zero": -0.006461526267230511,
+        "edict_ddim_50__simple": -0.015604550018906593,
+        "edict_ddim_50__ptp": -0.02095811814069748,
+        "edict_ddim_50__masactrl": -0.012362940236926079,
+        "ddpminv_ddpm_50__simple": -0.02269146963953972,
+        "ddpminv_ddpm_50__ptp": -0.03735125809907913,
+        "ddpminv_ddpm_50__masactrl": -0.020472053438425064,
+        "ddpminv_ddpm_50__pnp": -0.008612200617790222,
+        "ddpminv_ddpm_50__pix2pix_zero": -0.006461526267230511
     }
 
     # TestEdit.test_diffinv_ddim_50__pix2pix_zero_equal TestEdit.test_ddpminv_ddpm_50__pix2pix_zero_equal
@@ -102,7 +100,7 @@ class TestEdit(unittest.TestCase):
         """
 
         # reset seed
-        # enable_deterministic()
+        enable_deterministic()
 
     @classmethod
     def setUpClass(cls):

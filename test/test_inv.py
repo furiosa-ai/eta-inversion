@@ -40,12 +40,12 @@ class TestInv(unittest.TestCase):
 
     # target means
     test_data = {
-        "diffinv_ddim_50": -0.00339360604993999,
-        "nti_ddim_50": -0.005136287771165371,
-        "npi_ddim_50": -0.008206233382225037,
-        "proxnpi_ddim_50": -0.008206233382225037,
-        "edict_ddim_50": -0.0074141742661595345,
-        "ddpminv_ddpm_50": -0.011976341716945171
+        "diffinv_ddim_50": -0.0033935923129320145,
+        "nti_ddim_50": -0.005135257262736559,
+        "npi_ddim_50": -0.008206205442547798,
+        "proxnpi_ddim_50": -0.008206205442547798,
+        "edict_ddim_50": -0.007414201274514198,
+        "ddpminv_ddpm_50": -0.011976688168942928
     }
 
     @classmethod
