@@ -93,7 +93,7 @@ class DPMSolverMultistepInverseScheduler(DiffusionInverseScheduler):
             DPMSolverMultistepInverseScheduler.Output: Result with updated latent
         """
 
-        model_output, sample = noise_pred, latent
+        model_output, sample, timestep = noise_pred, latent, t
 
         if self.sched.num_inference_steps is None:
             raise ValueError(
