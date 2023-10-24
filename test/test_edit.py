@@ -86,6 +86,7 @@ class TestEdit(unittest.TestCase):
         "edict_ddim_50__simple": -0.015604550018906593,
         "edict_ddim_50__ptp": -0.02095811814069748,
         "edict_ddim_50__masactrl": -0.012362940236926079,
+        "edict_ddim_50__pix2pix_zero": 0.0015177088789641857,
         "ddpminv_ddpm_50__simple": -0.02269146963953972,
         "ddpminv_ddpm_50__ptp": -0.03735125809907913,
         "ddpminv_ddpm_50__masactrl": -0.020472053438425064,

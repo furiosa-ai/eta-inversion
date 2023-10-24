@@ -239,7 +239,7 @@ class DiffusionInversion:
 
         return context
     
-    def predict_noise(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale: Optional[Union[float, int]], is_fwd: bool=False,  **kwargs) -> torch.Tensor:
+    def predict_noise(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale: Optional[Union[float, int]], is_fwd: bool=False, **kwargs) -> torch.Tensor:
         """Make a noise prediction at timestep t using the diffusion model with classifier-free guidance.
 
         Args:

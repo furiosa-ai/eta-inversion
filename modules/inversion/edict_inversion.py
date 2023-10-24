@@ -11,7 +11,7 @@ import diffusers.schedulers.scheduling_ddim
 from diffusers.configuration_utils import FrozenDict
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
 from modules.editing.ptp_editor import PromptToPromptController
-from typing import Iterator, List, Optional, Tuple
+from typing import Iterator, List, Optional, Tuple, Union
 
 
 class EdictSchedulerBase:
@@ -290,6 +290,12 @@ class EdictInversion(DiffusionInversion):
         latent_pair = new_latents
         return new_latents
 
+    def predict_noise(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, 
+                      guidance_scale: Optional[Union[float, int]], is_fwd: bool=False, 
+                      latent_idx: Optional[int]=None, **kwargs) -> torch.Tensor:
+        # latent_idx unused here but might be used by injectors for editing
+        return super().predict_noise(latent, t, context, guidance_scale, is_fwd, **kwargs)
+
     def predict_step_forward_single(self, latent_idx: int, latent_base: torch.Tensor, latent_model_input: torch.Tensor, 
                             t: torch.Tensor, context: torch.Tensor, guidance_scale: float) -> torch.Tensor:
         """Perform a single forward step (noise prediction and scheduler step) for one latent in the latent pair
@@ -306,7 +312,7 @@ class EdictInversion(DiffusionInversion):
             torch.Tensor: Updated selected latent
         """
 
-        noise_pred = self.predict_noise(latent_model_input, t, context, guidance_scale, is_fwd=True)
+        noise_pred = self.predict_noise(latent_model_input, t, context, guidance_scale, is_fwd=True, latent_idx=latent_idx)
         new_latent = self.step_forward(noise_pred, t, latent_base).prev_sample
         return new_latent.to(latent_base.dtype)
     
@@ -329,7 +335,7 @@ class EdictInversion(DiffusionInversion):
         # controller callback
         self.controller.begin_step(latent_idx)
 
-        noise_pred = self.predict_noise(latent_model_input, t, context, guidance_scale, is_fwd=False)
+        noise_pred = self.predict_noise(latent_model_input, t, context, guidance_scale, is_fwd=False, latent_idx=latent_idx)
         new_latent = self.step_backward(noise_pred, t, latent_base).prev_sample
         new_latent = new_latent.to(latent_base.dtype)
         
