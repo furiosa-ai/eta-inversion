@@ -14,6 +14,9 @@ class NullTextInversion(DiffusionInversion):
     """Class implementing null-text-inversion
     """
 
+    dft_num_inner_steps = 10
+    dft_early_stop_epsilon = 1e-5
+
     def __init__(self, model: StableDiffusionPipeline, scheduler: Optional[str]=None, num_inference_steps: Optional[int]=None, 
                  guidance_scale_bwd: Optional[float]=None, guidance_scale_fwd: Optional[float]=None,
                  verbose: bool=False, num_inner_steps: Optional[int]=None, early_stop_epsilon: Optional[float]=None) -> None:
@@ -33,8 +36,8 @@ class NullTextInversion(DiffusionInversion):
 
         super().__init__(model, scheduler, num_inference_steps, guidance_scale_bwd, guidance_scale_fwd, verbose)
 
-        self.num_inner_steps = num_inner_steps or 10
-        self.early_stop_epsilon = early_stop_epsilon or 1e-5
+        self.num_inner_steps = num_inner_steps or NullTextInversion.dft_num_inner_steps
+        self.early_stop_epsilon = early_stop_epsilon or NullTextInversion.dft_early_stop_epsilon
 
     @torch.enable_grad()
     def null_optimization(self, latents: List[torch.Tensor], context: torch.Tensor, num_inner_steps: int, epsilon: float) -> List[torch.Tensor]:

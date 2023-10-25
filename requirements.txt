@@ -11,4 +11,4 @@ ipython
 ipykernel
 
 # gradio
-gradio
+gradio==3.44.0
