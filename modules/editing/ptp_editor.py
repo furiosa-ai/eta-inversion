@@ -2,7 +2,7 @@
 import torch
 import torch.nn.functional as F
 from modules.utils import ptp_utils, ptp
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from .controller import ControllerBase
 from .editor import ControllerBasedEditor
@@ -127,8 +127,8 @@ class PromptToPromptEditor(ControllerBasedEditor):
     """Prompt-to-prompt editor using a prompt-to-prompt controller for editing
     """
 
-    def __init__(self, inverter: DiffusionInversion) -> None:
-        super().__init__(inverter)
+    def __init__(self, inverter: DiffusionInversion, no_source_backward: bool=False, dft_cfg: Dict[Any, str]=None) -> None:
+        super().__init__(inverter, no_source_backward, dft_cfg)
 
     def make_controller(self, image: torch.Tensor, source_prompt: str, target_prompt: str, **kwargs) -> PromptToPromptController:
         return PromptToPromptController(model=self.inverter.model, source_prompt=source_prompt, target_prompt=target_prompt, **kwargs)

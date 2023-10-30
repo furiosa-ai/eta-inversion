@@ -77,12 +77,13 @@ class Demo:
         
         return edit_res["edit_image"]
 
-    def update_inversion_config_visibility(self, names, cat):
-        return [gr.update(visible=name.startswith(f"inverter.methods.{cat}.")) for name in names]
+    def update_config_visibility(self, type, names, name_visible):
+        visibilities = [name.startswith(f"{type}.methods.{name_visible}.") for name in names]
+        return [gr.update(visible=v) for v in visibilities]
 
     def build_source_edit_image(self):
         with gr.Row():
-            self.inputs["edit_cfg.source_image"] = gr.Image(label="Input", value="test/data/gnochi_mirror_sq.png", width=512, height=512)
+            self.inputs["editor.source_image"] = gr.Image(label="Input", value="test/data/gnochi_mirror_sq.png", width=512, height=512)
             self.outputs["edit_image"] = gr.Image(label="Output", width=512, height=512)
 
     def build_model(self):
@@ -90,70 +91,109 @@ class Demo:
             self.inputs["model.type"] = gr.Dropdown(label="Model", choices=self.get_model_choices(), value=self.default_values["model"])
 
     def build_invert(self):
-        with gr.Row():
-            self.inputs["inverter.type"] = gr.Dropdown(label="Inversion method", choices=self.get_inverter_choices(self.default_values["model"]), value=self.default_values["inverter"], interactive=True)
+        self.groups["inverter"] = {}
 
+        with gr.Column(), gr.Group():
+            with gr.Row():
+                self.inputs["inverter.type"] = gr.Dropdown(label="Inversion method", choices=self.get_inverter_choices(self.default_values["model"]), value=self.default_values["inverter"], interactive=True)
+            
             for inverter in self.inverters:
-                k = f"inverter.methods.{inverter}"
                 visible = self.default_values["inverter"] == inverter
+                with gr.Group(visible=visible) as self.groups["inverter"][inverter]:
+                    k = f"inverter.methods.{inverter}"
+                    dft_steps = 50
 
-                if inverter not in ("edict", "ddpminv"):
-                    self.inputs[f"{k}.scheduler"] = gr.Dropdown(
-                        label="Scheduler", choices=self.get_scheduler_choices(), value="ddim", visible=visible)
-                
-                dft_steps = 50
+                    if inverter == "edict":
+                        dft_fwd_cfg, dft_bwd_cfg = 3.0, 3.0
+                    elif inverter == "ddpminv":
+                        dft_fwd_cfg, dft_bwd_cfg = 3.5, 15
+                    else:
+                        dft_fwd_cfg, dft_bwd_cfg = 1.0, 7.5
 
-                if inverter == "edict":
-                    dft_fwd_cfg, dft_bwd_cfg = 3.0, 3.0
-                elif inverter == "ddpminv":
-                    dft_fwd_cfg, dft_bwd_cfg = 3.5, 15
-                else:
-                    dft_fwd_cfg, dft_bwd_cfg = 1.0, 7.5
+                    with gr.Row():
+                        if inverter not in ("edict", "ddpminv"):
+                            self.inputs[f"{k}.scheduler"] = gr.Dropdown(
+                                label="Scheduler", choices=self.get_scheduler_choices(), value="ddim")
+                        
+                        self.inputs[f"{k}.num_inference_steps"] = gr.Number(label="Steps", value=dft_steps, precision=0)
 
-                self.inputs[f"{k}.num_inference_steps"] = gr.Number(label="Steps", value=dft_steps, precision=0, visible=visible)
-                self.inputs[f"{k}.guidance_scale_fwd"] = gr.Number(label="Forward CFG scale", value=dft_fwd_cfg, visible=visible)
-                self.inputs[f"{k}.guidance_scale_bwd"] = gr.Number(label="Backward CFG scale", value=dft_bwd_cfg, visible=visible)
+                    with gr.Row():
+                        self.inputs[f"{k}.guidance_scale_fwd"] = gr.Number(label="Forward CFG scale", value=dft_fwd_cfg)
+                        self.inputs[f"{k}.guidance_scale_bwd"] = gr.Number(label="Backward CFG scale", value=dft_bwd_cfg)
 
-                if inverter == "nti":
-                    self.inputs[f"{k}.num_inner_steps"] = gr.Number(
-                        label="Inner steps", value=NullTextInversion.dft_num_inner_steps, precision=0, visible=visible)
-                    
-                    self.inputs[f"{k}.early_stop_epsilon"] = gr.Number(
-                        label="Early stop eps", value=NullTextInversion.dft_early_stop_epsilon, visible=visible)
-                    
-                if inverter == "proxnpi":
-                    self.inputs[f"{k}.prox"] = gr.Dropdown(
-                        label="Prox", choices=["l0", "l1"], value="l0", visible=visible)
-                    self.inputs[f"{k}.quantile"] = gr.Number(
-                        label="Quantile", value=ProximalNegativePromptInversion.dft_quantile, visible=visible)
-                    self.inputs[f"{k}.recon_lr"] = gr.Number(
-                        label="Recon LR", value=ProximalNegativePromptInversion.dft_recon_lr, precision=0, visible=visible)
-                    self.inputs[f"{k}.recon_t"] = gr.Number(
-                        label="Recon t", value=ProximalNegativePromptInversion.dft_recon_t, precision=0, visible=visible)
-                    self.inputs[f"{k}.dilate_mask"] = gr.Number(
-                        label="Dilate Mask", value=ProximalNegativePromptInversion.dft_dilate_mask, precision=0, visible=visible)
-                    
-                if inverter == "edict":
-                    self.inputs[f"{k}.mix_weight"] = gr.Number(
-                        label="Mix weight", value=EdictInversion.dft_mix_weight, visible=visible)
-                    self.inputs[f"{k}.leapfrog_steps"] = gr.Checkbox(
-                        label="Leapfrog steps", value=EdictInversion.dft_leapfrog_steps, visible=visible)
-                    self.inputs[f"{k}.init_image_strength"] = gr.Number(
-                        label="Init image strength", value=EdictInversion.dft_init_image_strength, visible=visible)
-                    
-                if inverter == "ddpminv":
-                    self.inputs[f"{k}.skip_steps"] = gr.Number(
-                        label="Skip steps", value=DDPMInversion.dft_skip_steps, visible=visible, 
-                        info="How many percent of steps to skip. Must be between 0 or 1.")
-                    self.inputs[f"{k}.forward_seed"] = gr.Number(
-                        label="Seed", value=-1, precision=0, visible=visible, 
-                        info="Use -1 for random seed.")
+                    with gr.Row():
+                        if inverter == "nti":
+                            self.inputs[f"{k}.num_inner_steps"] = gr.Number(
+                                label="Inner steps", value=NullTextInversion.dft_num_inner_steps, precision=0)
+                            
+                            self.inputs[f"{k}.early_stop_epsilon"] = gr.Number(
+                                label="Early stop eps", value=NullTextInversion.dft_early_stop_epsilon)
+                            
+                        if inverter == "proxnpi":
+                            self.inputs[f"{k}.prox"] = gr.Dropdown(
+                                label="Prox", choices=["l0", "l1"], value="l0")
+                            self.inputs[f"{k}.quantile"] = gr.Number(
+                                label="Quantile", value=ProximalNegativePromptInversion.dft_quantile)
+                            self.inputs[f"{k}.recon_lr"] = gr.Number(
+                                label="Recon LR", value=ProximalNegativePromptInversion.dft_recon_lr, precision=0)
+                            self.inputs[f"{k}.recon_t"] = gr.Number(
+                                label="Recon t", value=ProximalNegativePromptInversion.dft_recon_t, precision=0)
+                            self.inputs[f"{k}.dilate_mask"] = gr.Number(
+                                label="Dilate Mask", value=ProximalNegativePromptInversion.dft_dilate_mask, precision=0)
+                            
+                        if inverter == "edict":
+                            self.inputs[f"{k}.mix_weight"] = gr.Number(
+                                label="Mix weight", value=EdictInversion.dft_mix_weight)
+                            self.inputs[f"{k}.leapfrog_steps"] = gr.Checkbox(
+                                label="Leapfrog steps", value=EdictInversion.dft_leapfrog_steps)
+                            self.inputs[f"{k}.init_image_strength"] = gr.Number(
+                                label="Init image strength", value=EdictInversion.dft_init_image_strength)
+                            
+                        if inverter == "ddpminv":
+                            self.inputs[f"{k}.skip_steps"] = gr.Number(
+                                label="Skip steps", value=DDPMInversion.dft_skip_steps, 
+                                info="How many percent of steps to skip. Must be between 0 or 1.")
+                            self.inputs[f"{k}.forward_seed"] = gr.Number(
+                                label="Seed", value=-1, precision=0, 
+                                info="Use -1 for random seed.")
 
     def build_edit(self):
-        with gr.Column():
+        self.groups["editor"] = {}
+
+        with gr.Column(), gr.Group():
             self.inputs["editor.type"] = gr.Dropdown(label="Edit method", choices=self.get_editor_choices(self.default_values["inverter"]), value=self.default_values["editor"], interactive=True)
-            self.inputs["edit_cfg.source_prompt"] = gr.Textbox(label="Source prompt", value="a cat sitting next to a mirror")
-            self.inputs["edit_cfg.target_prompt"] = gr.Textbox(label="Target prompt", value="a tiger sitting next to a mirror")
+            
+            with gr.Row():
+                self.inputs["editor.source_prompt"] = gr.Textbox(label="Source prompt", value="a cat sitting next to a mirror")
+                self.inputs["editor.target_prompt"] = gr.Textbox(label="Target prompt", value="a tiger sitting next to a mirror")
+            # change to editor.methods.{name}.edit_cfg and move inside loop
+
+            for editor in self.editors:
+                visible = self.default_values["editor"] == editor
+                with gr.Group(visible=visible) as self.groups["editor"][editor]:
+                    k = f"editor.methods.{editor}"
+
+                    if editor == "simple":
+                        pass
+
+                    if editor == "ptp":
+                        pass
+                    
+                    if editor == "masactrl":
+                        self.inputs[f"{k}.step"] = gr.Number(
+                            label="Step", value=4, precision=0)
+                        
+                        self.inputs[f"{k}.layer"] = gr.Number(
+                            label="Layer", value=10, precision=0)
+
+                    # if editor == "pnp":
+                    if editor == "pnp":
+                        self.inputs[f"{k}.no_null_source_prompt"] = gr.Checkbox(
+                            label="Use source prompt", value=False, info="By default PNP does not use source prompt for inversion.")
+
+                    if editor == "pix2pix_zero":
+                        self.inputs[f"{k}.cross_attention_guidance_amount"] = gr.Number(
+                            label="Attention Guidance", value=0.1)
 
     def build_run(self):
         self.controls["edit"] = gr.Button("Edit")
@@ -161,11 +201,24 @@ class Demo:
     def setup_events(self):
         self.inputs["model.type"].change(lambda model: gr.update(choices=self.get_inverter_choices(model)), inputs=self.inputs["model.type"], outputs=self.inputs["inverter.type"])
         self.inputs["inverter.type"].change(lambda inverter: gr.update(choices=self.get_editor_choices(inverter)), inputs=self.inputs["inverter.type"], outputs=self.inputs["editor.type"])
-
-        inversion_inputs = {k: v for k, v in self.inputs.items() if k.startswith("inverter.methods.")}
-        self.inputs["inverter.type"].change(lambda value: self.update_inversion_config_visibility(list(inversion_inputs.keys()), value), inputs=self.inputs["inverter.type"], outputs=list(inversion_inputs.values()))
-
         self.controls["edit"].click(fn=lambda *values: self.run(dict(zip(self.inputs.keys(), values))), inputs=list(self.inputs.values()), outputs=self.outputs["edit_image"])
+
+        self.setup_inverter_edit_config_events("inverter")
+        self.setup_inverter_edit_config_events("editor")
+
+    def setup_inverter_edit_config_events(self, category):
+        dropdown = self.inputs[f"{category}.type"]
+        group_names, groups = zip(*self.groups[category].items())
+
+        def _update_vis(value):
+            visibilities = [(group_name == value) for group_name in group_names]
+            return [gr.update(visible=v) for v in visibilities]
+
+        dropdown.change(
+            _update_vis,
+            inputs=dropdown,
+            outputs=list(groups)
+        )
 
     def build(self):
         # TODO: add gallery with old images
@@ -175,6 +228,7 @@ class Demo:
             self.inputs = {}
             self.outputs = {}
             self.controls = {}
+            self.groups = {}
 
             self.build_source_edit_image()
 

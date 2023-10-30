@@ -65,8 +65,12 @@ class EditorManager:
         cfg["inverter"].update(cfg["inverter"]["methods"][cfg["inverter"]["type"]])
         del cfg["inverter"]["methods"]
 
-        # cfg["editor"].update(cfg["editor"]["methods"][cfg["editor"]["type"]])
-        # del cfg["editor"]["methods"]
+        cfg["editor"].update(cfg["editor"]["methods"].get(cfg["editor"]["type"], {}))
+        del cfg["editor"]["methods"]
+
+        source_image = cfg["editor"].pop("source_image")
+        source_prompt = cfg["editor"].pop("source_prompt")
+        target_prompt = cfg["editor"].pop("target_prompt")
 
         if not _dict_equal(cfg["model"], self.cfg.get("model", None)):
             self.model = StableDiffusionPipeline.from_pretrained(cfg["model"]["type"]).to(self.device)
@@ -81,12 +85,8 @@ class EditorManager:
         if not _dict_equal(cfg["editor"], self.cfg.get("editor", None)):
             self.editor = load_editor(inverter=self.inverter, **cfg["editor"])
 
-        source_image = cfg["edit_cfg"].pop("source_image")
-        source_prompt = cfg["edit_cfg"].pop("source_prompt")
-        target_prompt = cfg["edit_cfg"].pop("target_prompt")
-
         image = self.preproc(source_image)
-        edit_res = self.editor.edit(image, source_prompt, target_prompt, cfg["edit_cfg"] if len(cfg["edit_cfg"]) > 0 else None)  #  cfg=self.get_key("edit_cfg")
+        edit_res = self.editor.edit(image, source_prompt, target_prompt)  #  cfg=self.get_key("edit_cfg")
         img_edit = self.postproc(edit_res["image"])
 
         self.cfg = cfg
