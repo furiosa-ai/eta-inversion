@@ -195,7 +195,14 @@ class TestEdit(unittest.TestCase):
         cls.setUpClass()
 
         for test_name, edit_cfg in cls.edit_cfgs.items():
-            setattr(cls, f"test_{test_name}_equal", TestEdit.template_test_edit(test_name, edit_cfg, cls.test_img, cls.test_source_prompt, cls.test_target_prompt, cls.test_edit_method_configs.get(edit_cfg["edit"]["type"], None)))
+            setattr(cls, f"test_{test_name}_equal", TestEdit.template_test_edit(
+                test_name, edit_cfg, cls.test_img, cls.test_source_prompt, cls.test_target_prompt, 
+                cls.test_edit_method_configs.get(edit_cfg["edit"]["type"], None)))
+
+            if edit_cfg["inversion"]["type"] == "diffinv":
+                setattr(cls, f"test_{test_name}_consistency", TestEdit.template_test_edit_consistency(
+                    test_name, edit_cfg, cls.test_img, cls.test_source_prompt, cls.test_target_prompt, 
+                    cls.test_edit_method_configs.get(edit_cfg["edit"]["type"], None)))
 
     @staticmethod
     def template_test_edit(test_name: str, edit_config: Dict[str, Any], image: str, 
@@ -234,6 +241,39 @@ class TestEdit(unittest.TestCase):
             self.assertIsNotNone(mean_target, f"No test data found. Output mean is {torch.mean(edit_image).item()}")
             self.assert_mean_almost_equal(edit_image, mean_target, places=None if edit_config["inversion"]["type"] not in ("nti",) else 3)
             # self.assert_mean_almost_equal(edit_res["latent"], target_mean)
+
+        return test_func
+    
+    @staticmethod
+    def template_test_edit_consistency(test_name: str, edit_config: Dict[str, Any], image: str, 
+                           source_prompt: str, target_prompt: str, edit_add_config: Dict[str, Any]) -> Callable:
+        """Generate test function which checks if editing output is consistent if run multiple times.
+
+        Args:
+            test_name (str): Name of the test
+            edit_config (Dict[str, Any]): Editing config to test
+            image (str): Image path to test
+            source_prompt (str): Source prompt
+            target_prompt (str): Target prompt
+            edit_add_config (Dict[str, Any]): Additional editing config (ptp)
+
+        Returns:
+            Callable: Test function
+        """
+
+        def test_func(self):
+            print("\n", self.id())
+
+            edit_res1 = self.edit_helper(edit_config, image, source_prompt, target_prompt, edit_add_config)
+            edit_res2 = self.edit_helper(edit_config, image, source_prompt + " test", target_prompt + " test", edit_add_config)
+            edit_res3 = self.edit_helper(edit_config, image, source_prompt, target_prompt, edit_add_config)
+
+            edit_image1 = edit_res1[self.test_crit]
+            edit_image3 = edit_res3[self.test_crit]
+
+            loss = torch.nn.MSELoss()(edit_image1, edit_image3).item()
+
+            self.assertEqual(loss, 0)
 
         return test_func
 

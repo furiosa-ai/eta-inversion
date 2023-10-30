@@ -10,6 +10,7 @@ from tqdm import trange, tqdm
 import yaml
 import torch
 import os
+import gc
 
 from modules import load_inverter, load_editor
 # from modules.exceptions import DiffusionInversionException
@@ -59,6 +60,9 @@ def run_eval(path: str, data: str, method: Dict[str, Any], edit_method: Dict[str
             # load inverter and editor module
             inverter = load_inverter(model=ldm_stable, **method)
             editor = load_editor(inverter=inverter, **edit_method)
+
+        gc.collect()
+        torch.cuda.empty_cache()
 
         # needs refactoring
         image_file = sample.get("image_file", None)
