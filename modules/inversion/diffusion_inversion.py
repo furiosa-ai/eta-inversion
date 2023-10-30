@@ -229,7 +229,11 @@ class DiffusionInversion:
         if negative_prompt is not None:
             # tokenize and embed negative prompt
             uncond_input = self.model.tokenizer(
-                [negative_prompt], padding="max_length", max_length=self.model.tokenizer.model_max_length, return_tensors="pt"
+                [negative_prompt],
+                padding="max_length",
+                max_length=self.model.tokenizer.model_max_length,
+                truncation=True,
+                return_tensors="pt"
             )
             uncond_embeddings = self.model.text_encoder(uncond_input.input_ids.to(self.model.device))[0]
 

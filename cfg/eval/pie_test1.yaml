@@ -5,6 +5,7 @@ edit_method:
 - type: ptp
 - type: masactrl
 - type: pnp
+- type: pix2pix_zero
 method:
 - type: diffinv
   scheduler: ddim

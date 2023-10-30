@@ -90,7 +90,8 @@ class EditResultData:
     """
 
     def __init__(self, data_name: str, method: Dict[str, Any], edit_method: Dict[str, Any], 
-                 edit_cfg: Dict[str, Any]=None, exp_name: Optional[str]=None, path: Optional[str]=None, **kwargs) -> None:
+                 edit_cfg: Dict[str, Any]=None, exp_name: Optional[str]=None, path: Optional[str]=None, 
+                 skip_existing=True, **kwargs) -> None:
         """Initialies a new dataset for evaluation.
 
         Args:
@@ -100,6 +101,7 @@ class EditResultData:
             edit_cfg (Dict[str, Any], optional): Additional editing configuration (for ptp). Defaults to None.
             exp_name (Optional[str], optional): Optional experiment name, either exp_name or path should be provided. Defaults to None.
             path (Optional[str], optional): Optional path to the experiment, either exp_name or path should be provided. Defaults to None.
+            skip_existing (bool): If true returns None in __getitem__ when edit image file already exists. Defaults to True.
         """
 
         self.path = Path(path) if path is not None else None
@@ -110,7 +112,8 @@ class EditResultData:
         self.metrics = {}
         self.exp_name = exp_name
         self.edit_cfg = edit_cfg
-    
+        self.skip_existing = skip_existing
+
     @staticmethod
     def from_state_dict(dic: Dict[str, Any], **kwargs) -> "EditResultData":
         """Creates a new dataset for evalation from a state dict
@@ -225,10 +228,15 @@ class EditResultData:
             Dict[str, Any]: Image data with metrics
         """
 
+        edit_image_file = self.path / "imgs" / f"{self.get_edit_image_name(i)}.png"
+
+        if self.skip_existing and edit_image_file.exists():
+            return None
+
         sample = {**self.data[i]}
 
         sample["image"] = sample["image"]
-        sample["edit_image_file"] = self.path / "imgs" / f"{self.get_edit_image_name(i)}.png"
+        sample["edit_image_file"] = edit_image_file
 
         if not self.data.skip_img_load and Path(sample["edit_image_file"]).exists():
             sample["edit_image"] = cv2.cvtColor(cv2.imread(str(sample["edit_image_file"])), cv2.COLOR_BGR2RGB) 

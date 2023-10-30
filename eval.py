@@ -23,6 +23,7 @@ from queue import Queue, Empty
 from typing import List, Optional
 
 
+@torch.no_grad()
 def run_eval(path: str, data: str, method: Dict[str, Any], edit_method: Dict[str, Any], edit_cfg: Dict[str, Any]) -> None:
     """Edits all images in the dataset with the given configuation and stores all output images
 
@@ -39,20 +40,25 @@ def run_eval(path: str, data: str, method: Dict[str, Any], edit_method: Dict[str
     # metric_name = metric
 
     # Loads and manages dataset for evaluation
-    data = EditResultData(data, method, edit_method, path=path, skip_img_load=True)
+    data = EditResultData(data, method, edit_method, path=path, skip_img_load=True, skip_existing=True)
 
-    # load diffusion model
-    ldm_stable = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4").to(device)
-    preproc = StablePreprocess(device, size=512, center_crop=True, return_np=False, pil_resize=True)
-    postproc = StablePostProc()
-
-    # load inverter and editor module
-    inverter = load_inverter(model=ldm_stable, **method)
-    editor = load_editor(inverter=inverter, **edit_method)
+    ldm_stable, preproc, postproc, inverter, editor = None, None, None, None, None
 
     for i in trange(len(data)):
         # iterate over evaluation dataset
         sample = data[i]
+
+        if sample is None:
+            continue
+        elif ldm_stable is None:
+            # load diffusion model
+            ldm_stable = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4").to(device)
+            preproc = StablePreprocess(device, size=512, center_crop=True, return_np=False, pil_resize=True)
+            postproc = StablePostProc()
+
+            # load inverter and editor module
+            inverter = load_inverter(model=ldm_stable, **method)
+            editor = load_editor(inverter=inverter, **edit_method)
 
         # needs refactoring
         image_file = sample.get("image_file", None)
