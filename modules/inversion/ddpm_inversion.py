@@ -3,10 +3,16 @@ from .diffusion_inversion import DiffusionInversion
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from diffusers import DDIMScheduler
+from modules.inverse_schedulers import DDPMInverseScheduler
+
 
 class DDPMInversion(DiffusionInversion):
     """DDPM inversion implementation. Based on https://github.com/inbarhub/DDPM_inversion
     """
+
+    dft_skip_steps = 0.36
+    dft_forward_seed = 0
 
     def __init__(self, model: StableDiffusionPipeline, scheduler: Optional[str]=None, num_inference_steps: Optional[int]=None, 
                  guidance_scale_bwd: Optional[float]=None, guidance_scale_fwd: Optional[float]=None,
@@ -29,10 +35,12 @@ class DDPMInversion(DiffusionInversion):
         guidance_scale_fwd = guidance_scale_fwd or 3.5
         guidance_scale_bwd = guidance_scale_bwd or 15
         self.skip_steps = skip_steps or 0.36
+        self.forward_seed = forward_seed if forward_seed >= 0 else None
         
         super().__init__(model, scheduler, num_inference_steps, guidance_scale_bwd, guidance_scale_fwd, verbose)
 
-        self.forward_seed = forward_seed
+    def create_schedulers(self, model: StableDiffusionPipeline, scheduler: str, num_inference_steps: int) -> Tuple[DDIMScheduler, DDIMScheduler, DDPMInverseScheduler]:
+        return super().create_schedulers(model, "ddpm", num_inference_steps)
 
     def predict_step_forward(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale_fwd: float, xts: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Perform one forward diffusion steps. Makes a noise prediction using SD's UNet first and then updates the latent using the noise scheduler.

@@ -9,3 +9,6 @@ torchmetrics
 # for notebooks
 ipython
 ipykernel
+
+# gradio
+gradio==3.44.0

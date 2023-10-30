@@ -24,6 +24,12 @@ class ProximalNegativePromptInversion(NegativePromptInversion):
     """Proximal negative prompt inversion implementation. Based on https://github.com/phymhan/prompt-to-prompt
     """
 
+    dft_prox = "l0"
+    dft_quantile = 0.7
+    dft_recon_lr = 1
+    dft_recon_t = 400
+    dft_dilate_mask = 1
+
     def __init__(self, model: StableDiffusionPipeline, scheduler: Optional[str]=None, num_inference_steps: Optional[int]=None, 
                  guidance_scale_bwd: Optional[float]=None, guidance_scale_fwd: Optional[float]=None,
                  verbose: bool=False, prox: str="l0", quantile: float=0.7, recon_lr: int=1, recon_t: int=400, dilate_mask: int=1) -> None:

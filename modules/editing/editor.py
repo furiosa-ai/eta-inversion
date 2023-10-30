@@ -33,18 +33,21 @@ class ControllerBasedEditor(Editor):
     """Base editor using a controller
     """
 
-    def __init__(self, inverter: DiffusionInversion, no_source_backward: bool=False) -> None:
+    def __init__(self, inverter: DiffusionInversion, no_source_backward: bool=False, dft_cfg: Optional[Dict[Any, str]]=None) -> None:
         """Initiates a new editor object
 
         Args:
             inverter (DiffusionInversion): Inverter to use for editing
             no_source_backward (bool, optional): If True, only target prompt is used for backward. Defaults to False.
+            dft_cfg (Optional[Dict[Any, str]], optional). Default config to use for editing. 
+            Used if no config is provided to edit(). Defaults to None.
         """
 
         super().__init__()
 
         self.inverter = inverter
         self.no_source_backward = no_source_backward
+        self.dft_cfg = dft_cfg if dft_cfg is not None else {}
 
     def make_controller(self, image: torch.Tensor, source_prompt: str, target_prompt: str, **kwargs) -> ControllerBase:
         """Creates a new controller for editing the current image
@@ -61,7 +64,7 @@ class ControllerBasedEditor(Editor):
 
     def edit(self, image: torch.Tensor, source_prompt: str, target_prompt: str, cfg: Optional[Dict[str, Any]]=None, **kwargs) -> Dict[str, Any]:
         if cfg is None:
-            cfg = {}
+            cfg = self.dft_cfg
 
         # create context from prompts
         src_context = self.inverter.create_context(source_prompt)

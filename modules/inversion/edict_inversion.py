@@ -186,6 +186,10 @@ class EdictSchedulerInverse(EdictSchedulerBase):
 
 
 class EdictInversion(DiffusionInversion):
+    dft_mix_weight = 0.93
+    dft_leapfrog_steps = True
+    dft_init_image_strength = 0.8
+
     def __init__(self, model: StableDiffusionPipeline, scheduler: Optional[str]=None, num_inference_steps: Optional[int]=None, 
                  guidance_scale_bwd: Optional[float]=None, guidance_scale_fwd: Optional[float]=None,
                  verbose: bool=False, mix_weight: float=0.93, leapfrog_steps: bool=True, init_image_strength: float=0.8) -> None:
