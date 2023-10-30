@@ -6,10 +6,20 @@ import torch
 from modules import load_inverter, load_editor
 from modules import StablePreprocess, StablePostProc
 from diffusers import StableDiffusionPipeline
+from typing import Dict, Any, List
 
 
-def dict_set_deep(dic, key, val):
-    def _set(dic, keys):
+# 
+def dict_set_deep(dic: Dict[str, Any], key: str, val: Any) -> None:
+    """Sets a key with "." separators in a nested dict.
+
+    Args:
+        dic (Dict[str, Any]): Dict to modify
+        key (str): Key with "."
+        val (Any): Value to set
+    """
+
+    def _set(dic: Dict[str, Any], keys: List[str]) -> None:
         key, keys = keys[0], keys[1:]
 
         if len(keys) == 0:
@@ -23,7 +33,16 @@ def dict_set_deep(dic, key, val):
     _set(dic, key.split("."))
 
 
-def to_nested_dict(dic):
+def to_nested_dict(dic: Dict[str, Any]) -> Dict[str, Any]:
+    """Helper functions to convert a flat dict with "." in keys to a nested dict
+
+    Args:
+        dic (Dict[str, Any]): Flat dict where keys contain "." separators.
+
+    Returns:
+        Dict[str, Any]: Nested dict.
+    """
+
     out = {}
 
     for k, v in dic.items():
@@ -31,7 +50,18 @@ def to_nested_dict(dic):
 
     return out
 
-def _dict_equal(dic1, dic2):
+
+def dict_equal(dic1: Dict[str, Any], dic2: Dict[str, Any]) -> bool:
+    """Test if two dicts are equal.
+
+    Args:
+        dic1 (Dict[str, Any]): First dict.
+        dic2 (Dict[str, Any]): Second dict.
+
+    Returns:
+        bool: True if equal, otherwise False.
+    """
+
     if dic1 is None or dic2 is None:
         return False
 
@@ -43,7 +73,11 @@ def _dict_equal(dic1, dic2):
 
 
 class EditorManager:
+    """Class processing editing requests from Gradio output
+    """
+
     def __init__(self) -> None:
+        # cached components to speed up inference
         self.cached = {
             "model": None,
             "inverter": None,
@@ -58,7 +92,16 @@ class EditorManager:
         self.editor = None
         self.cfg = {}
 
-    def process_ptp_config(self, cfg):
+    def process_ptp_config(self, cfg: Dict[str, Any]) -> Dict[str, Any]:
+        """Formats ptp config for ptp editor
+
+        Args:
+            cfg (Dict[str, Any): Config from gradio
+
+        Returns:
+            Dict[str, Any: Config with formatted ptp options.
+        """
+
         ptp = cfg["editor"]["methods"]["ptp"]
         ptp_dft_cfg = ptp["dft_cfg"]
 
@@ -79,36 +122,51 @@ class EditorManager:
         return cfg
 
     @torch.no_grad()
-    def run(self, cfg):
+    def run(self, cfg: Dict[str, Any]) -> Dict[str, Any]:
+        """Runs editing for the passed config from Gradio and returns edited image results
+
+        Args:
+            cfg (Dict[str, Any]): Config from Gradio
+
+        Returns:
+            Dict[str, Any]: Image editing result.
+        """
+
+        # convert flat to nested dict
         cfg = to_nested_dict(cfg)
 
+        # format ptp config
         cfg = self.process_ptp_config(cfg)
 
+        # get inverter and editor arguments for the selected inverter and editor
         cfg["inverter"].update(cfg["inverter"]["methods"][cfg["inverter"]["type"]])
         del cfg["inverter"]["methods"]
 
         cfg["editor"].update(cfg["editor"]["methods"].get(cfg["editor"]["type"], {}))
         del cfg["editor"]["methods"]
 
+        # get basic editing arguments
         source_image = cfg["editor"].pop("source_image")
         source_prompt = cfg["editor"].pop("source_prompt")
         target_prompt = cfg["editor"].pop("target_prompt")
 
-        if not _dict_equal(cfg["model"], self.cfg.get("model", None)):
+        # reload components if config changed
+        if not dict_equal(cfg["model"], self.cfg.get("model", None)):
             self.model = StableDiffusionPipeline.from_pretrained(cfg["model"]["type"]).to(self.device)
             self.preproc = StablePreprocess(self.device, size=512, center_crop=True, return_np=False, pil_resize=True)
             self.postproc = StablePostProc()
             self.cfg["inverter"] = None
 
-        if not _dict_equal(cfg["inverter"], self.cfg.get("inverter", None)):
+        if not dict_equal(cfg["inverter"], self.cfg.get("inverter", None)):
             self.inverter = load_inverter(model=self.model, **cfg["inverter"])
             self.cfg["editor"] = None
 
-        if not _dict_equal(cfg["editor"], self.cfg.get("editor", None)):
+        if not dict_equal(cfg["editor"], self.cfg.get("editor", None)):
             self.editor = load_editor(inverter=self.inverter, **cfg["editor"])
 
+        # editing
         image = self.preproc(source_image)
-        edit_res = self.editor.edit(image, source_prompt, target_prompt)  #  cfg=self.get_key("edit_cfg")
+        edit_res = self.editor.edit(image, source_prompt, target_prompt)
         img_edit = self.postproc(edit_res["image"])
 
         self.cfg = cfg

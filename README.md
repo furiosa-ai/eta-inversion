@@ -295,6 +295,14 @@ Finally you can visualize the computed metrics with [notebooks/visualize_results
 
 </details>
 
+### Demo
+
+To run the provided Gradio run
+```bash
+python demo/run.py
+```
+and open `http://localhost:7860/` in your browser.
+
 ## Related Papers
 
 <details><summary> <h3> Generation </h3> </summary>
