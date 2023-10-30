@@ -72,7 +72,12 @@ class Demo:
     def get_scheduler_choices(self):
         return [(self.schedulers[o], o) for o in self.schedulers.keys()]
         
+    def process_config(self, cfg):
+        return cfg
+
     def run(self, cfg):
+        cfg = self.process_config(cfg)
+
         edit_res = self.editor_manager.run(cfg)
         
         return edit_res["edit_image"]
@@ -133,7 +138,8 @@ class Demo:
                             self.inputs[f"{k}.prox"] = gr.Dropdown(
                                 label="Prox", choices=["l0", "l1"], value="l0")
                             self.inputs[f"{k}.quantile"] = gr.Number(
-                                label="Quantile", value=ProximalNegativePromptInversion.dft_quantile)
+                                label="Quantile", value=ProximalNegativePromptInversion.dft_quantile,
+                                minimum=0, maximum=1, step=0.1,)
                             self.inputs[f"{k}.recon_lr"] = gr.Number(
                                 label="Recon LR", value=ProximalNegativePromptInversion.dft_recon_lr, precision=0)
                             self.inputs[f"{k}.recon_t"] = gr.Number(
@@ -143,15 +149,18 @@ class Demo:
                             
                         if inverter == "edict":
                             self.inputs[f"{k}.mix_weight"] = gr.Number(
-                                label="Mix weight", value=EdictInversion.dft_mix_weight)
+                                label="Mix weight", value=EdictInversion.dft_mix_weight, 
+                                minimum=0, maximum=1, step=0.1,)
                             self.inputs[f"{k}.leapfrog_steps"] = gr.Checkbox(
                                 label="Leapfrog steps", value=EdictInversion.dft_leapfrog_steps)
                             self.inputs[f"{k}.init_image_strength"] = gr.Number(
-                                label="Init image strength", value=EdictInversion.dft_init_image_strength)
+                                label="Init image strength", value=EdictInversion.dft_init_image_strength,
+                                minimum=0, maximum=1, step=0.1,)
                             
                         if inverter == "ddpminv":
                             self.inputs[f"{k}.skip_steps"] = gr.Number(
                                 label="Skip steps", value=DDPMInversion.dft_skip_steps, 
+                                minimum=0, maximum=1, step=0.1,
                                 info="How many percent of steps to skip. Must be between 0 or 1.")
                             self.inputs[f"{k}.forward_seed"] = gr.Number(
                                 label="Seed", value=-1, precision=0, 
@@ -177,7 +186,42 @@ class Demo:
                         pass
 
                     if editor == "ptp":
-                        pass
+                        # is_replace_controller
+                        # cross_replace_steps = {'default_': .8,}
+                        # self_replace_steps = .5
+                        # blend_word = ((('cat',), ("tiger",))) # for local edit. If it is not local yet - use only the source object: blend_word = ((('cat',), ("cat",))).
+                        # eq_params = {"words": ("tiger",), "values": (2,)} # amplify attention to the word "tiger" by *2 
+
+                        with gr.Row():
+                            self.inputs[f"{k}.dft_cfg.is_replace_controller"] = gr.Checkbox(
+                                label="Replace", value=True
+                            )
+
+                            self.inputs[f"{k}.dft_cfg.cross_replace_steps"] = gr.Number(
+                                label="Cross replace steps", value=0.8, minimum=0, maximum=1, step=0.1,
+                            )
+
+                            self.inputs[f"{k}.dft_cfg.self_replace_steps"] = gr.Number(
+                                label="Self replace steps", value=0.5, minimum=0, maximum=1, step=0.1,
+                            )
+
+                        with gr.Row():
+                            self.inputs[f"{k}.dft_cfg.source_blend_word"] = gr.Textbox(
+                                label="Source blend word", value="cat",
+                            )
+
+                            self.inputs[f"{k}.dft_cfg.target_blend_word"] = gr.Textbox(
+                                label="Target blend word", value="tiger",
+                            )
+
+                        with gr.Row():
+                            self.inputs[f"{k}.dft_cfg.eq_params_words"] = gr.Textbox(
+                                label="Amplify word", value="tiger",
+                            )
+
+                            self.inputs[f"{k}.dft_cfg.eq_params_values"] = gr.Number(
+                                label="Amplify amount", value=2,
+                            )
                     
                     if editor == "masactrl":
                         self.inputs[f"{k}.step"] = gr.Number(
@@ -193,7 +237,7 @@ class Demo:
 
                     if editor == "pix2pix_zero":
                         self.inputs[f"{k}.cross_attention_guidance_amount"] = gr.Number(
-                            label="Attention Guidance", value=0.1)
+                            label="Attention Guidance", value=0.1, minimum=0, maximum=1, step=0.1,)
 
     def build_run(self):
         self.controls["edit"] = gr.Button("Edit")

@@ -58,9 +58,31 @@ class EditorManager:
         self.editor = None
         self.cfg = {}
 
+    def process_ptp_config(self, cfg):
+        ptp = cfg["editor"]["methods"]["ptp"]
+        ptp_dft_cfg = ptp["dft_cfg"]
+
+        ptp["dft_cfg"] = {
+            "is_replace_controller": ptp_dft_cfg["is_replace_controller"],
+            "cross_replace_steps": {'default_': ptp_dft_cfg["cross_replace_steps"]},
+            "self_replace_steps": ptp_dft_cfg["self_replace_steps"],
+            "blend_words": (
+                (ptp_dft_cfg["source_blend_word"],), 
+                (ptp_dft_cfg["target_blend_word"],)
+            ),
+            "equilizer_params": {
+                "words": (ptp_dft_cfg["eq_params_words"],),
+                "values": (ptp_dft_cfg["eq_params_values"],),
+            },
+        }
+
+        return cfg
+
     @torch.no_grad()
     def run(self, cfg):
         cfg = to_nested_dict(cfg)
+
+        cfg = self.process_ptp_config(cfg)
 
         cfg["inverter"].update(cfg["inverter"]["methods"][cfg["inverter"]["type"]])
         del cfg["inverter"]["methods"]
