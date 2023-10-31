@@ -297,7 +297,7 @@ Finally you can visualize the computed metrics with [notebooks/visualize_results
 
 ### Demo
 
-To run the provided Gradio run
+To run the provided Gradio demo run
 ```bash
 python demo/run.py
 ```
