@@ -303,6 +303,8 @@ python demo/run.py
 ```
 and open `http://localhost:7860/` in your browser.
 
+![Gradio](docs/images/gradio_screenshot.png)
+
 ## Related Papers
 
 <details><summary> <h3> Generation </h3> </summary>

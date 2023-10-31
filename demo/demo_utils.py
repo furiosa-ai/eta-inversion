@@ -17,9 +17,6 @@ class Demo:
 
     def __init__(self) -> None:
         """Creates a new demo gradio instance.
-
-        Args:
-            editor_manager (_type_): _description_
         """
         
         # dropdown options [value, label]
@@ -295,11 +292,12 @@ class Demo:
                             )
                     
                     if editor == "masactrl":
-                        self.inputs[f"{k}.step"] = gr.Number(
-                            label="Step", value=4, precision=0)
-                        
-                        self.inputs[f"{k}.layer"] = gr.Number(
-                            label="Layer", value=10, precision=0)
+                        with gr.Row():
+                            self.inputs[f"{k}.step"] = gr.Number(
+                                label="Step", value=4, precision=0)
+                            
+                            self.inputs[f"{k}.layer"] = gr.Number(
+                                label="Layer", value=10, precision=0)
 
                     if editor == "pnp":
                         self.inputs[f"{k}.no_null_source_prompt"] = gr.Checkbox(
@@ -379,7 +377,7 @@ class Demo:
             gr.Markdown(
             """
             # Diffusion Image Editing
-            Select and configure editing and click **Edit**.
+            Configure editing and click **Edit**.
             """)
 
             self.build_source_edit_image()
