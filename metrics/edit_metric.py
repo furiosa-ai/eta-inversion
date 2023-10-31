@@ -33,19 +33,29 @@ class EditMetric(SimpleMetric):
 
         self.metric_name = name
         self.metric = {
+            # legacy clip metrics
             "clip": CLIPSimilarity,
+            "blipclip": partial(CLIPSimilarity, metric="text_text"),
+            "clip_pix2pix": ClipSimilarityPix2Pix,
             "clip_acc": CLIPAccuracy,
-            "blipclip": BLIPCLIPSimilarity,
             "blipclip_acc": BLIPCLIPAccuracy,
+
+            # TODO: replace with new clip metrics
+            "clip_text_img": partial(CLIPSimilarity, metric="text_img"),
+            "clip_img_img": partial(CLIPSimilarity, metric="img_img"),
+            "clip_text_text": partial(CLIPSimilarity, metric="text_text"),
+            "clip_textdir_imgdir": partial(CLIPSimilarity, metric="textdir_imgdir"),
+            "clip_text_img_acc": partial(CLIPAccuracy, metric="text_img"),
+            "clip_text_text_acc": partial(CLIPAccuracy, metric="text_text"),
+
             "dinovitstruct": DinoVitStructure,
             "dinovitstruct_v2": partial(DinoVitStructure, vit_model="dinov2_vitb14"),
-            "clip_pix2pix": ClipSimilarityPix2Pix,
             "lpips": LPIPSMetric,
             "nslpips": NSLPIPS,
             "bglpips": BGLPIPS,
             "ssim": SSIM,
             "msssim": MSSSIM,
-        }[self.metric_name](**kwargs)
+        }[self.metric_name](input_range=input_range, device=device, **kwargs)
 
     @staticmethod
     def get_available_metrics() -> List[str]:
@@ -56,12 +66,20 @@ class EditMetric(SimpleMetric):
         """
         return [
             "clip",
-            "clip_acc",
             "blipclip",
+            "clip_pix2pix",
+            "clip_acc",
             "blipclip_acc",
+
+            # "clip_text_img",
+            # "clip_img_img",
+            # "clip_text_text",
+            # "clip_textdir_imgdir",
+            # "clip_text_img_acc",
+            # "clip_text_text_acc",
+
             "dinovitstruct",
             "dinovitstruct_v2",
-            "clip_pix2pix",
             "lpips",
             "nslpips",
             "bglpips",
@@ -87,22 +105,24 @@ class EditMetric(SimpleMetric):
 
         # select required arguments for respective metric
         args = {
-            "clip": (edit_image, target_prompt),
-            "clip_acc": (edit_image, source_prompt, target_prompt),
-            "blipclip": (edit_image, target_prompt),
+            "clip": dict(target_image=edit_image, target_prompt=target_prompt),
+            "clip_pix2pix": dict(source_image=source_image, target_image=edit_image, 
+                                 source_prompt=source_prompt, target_prompt=target_prompt),
             "blipclip_acc": (edit_image, source_prompt, target_prompt),
             "dinovitstruct": (source_image, edit_image),
             "dinovitstruct_v2": (source_image, edit_image),
-            "clip_pix2pix": (source_image, edit_image, source_prompt, target_prompt),
             "lpips": (source_image, edit_image),
             "nslpips": (source_image, edit_image, source_prompt, edit_word),
             "bglpips": (source_image, edit_image, source_prompt, mask),
             "ssim": (edit_image, source_image), 
             "msssim": (edit_image, source_image), 
-        }[self.metric_name]
+        }.get(self.metric_name, dict(
+            source_image=source_image, target_image=edit_image, 
+            source_prompt=source_prompt, target_prompt=target_prompt),
+        )
 
         # compute loss and convert to float
-        loss = self.metric.update(*args)
+        loss = self.metric.update(*args) if isinstance(args, tuple) else self.metric.update(**args)
 
         if isinstance(loss, (torch.Tensor,)):
             loss = loss.item()

@@ -28,20 +28,22 @@ class TestMetrics(unittest.TestCase):
     """
 
     # metrics to test
-    metrics = [
-        "clip",
-        "clip_acc",
-        "blipclip",
-        "blipclip_acc",
-        "dinovitstruct",
-        "dinovitstruct_v2",
-        "clip_pix2pix",
-        "lpips",
-        "nslpips",
-        "bglpips",
-        "ssim",
-        "msssim",
-    ]
+    # metrics = [
+    #     "clip",
+    #     "clip_acc",
+    #     "blipclip",
+    #     "blipclip_acc",
+    #     "dinovitstruct",
+    #     "dinovitstruct_v2",
+    #     "clip_pix2pix",
+    #     "lpips",
+    #     "nslpips",
+    #     "bglpips",
+    #     "ssim",
+    #     "msssim",
+    # ]
+
+    metrics = EditMetric.get_available_metrics()
 
     device = "cuda"
 

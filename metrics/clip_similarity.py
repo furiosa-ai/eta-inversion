@@ -5,7 +5,8 @@ import numpy as np
 import torch
 from PIL import Image
 from clip.model import CLIP
-from typing import List, Tuple, Optional
+from typing import Any, List, Tuple, Optional, Union
+import torch.nn.functional as F
 
 
 # Imagenet caption templates. Used to obtain better CLIP features for a prompt by averaging over all templates
@@ -124,60 +125,157 @@ def get_embedding_for_prompt(model: CLIP, prompt: str, templates: List[str]) -> 
     return class_embedding.float()
 
 
-class CLIPSimilarity(SimpleMetric):
-    """CLIP similarity for image-text similarity. Ranges from 1 (best) to 0 (worst)."""
+class BLIPCaptionGenerator:
+    """Generates text captions for images using BLIP
+    """
 
-    def __init__(self, input_range: Tuple[int, int]=(-1, 1), device: Optional[str]=None, use_imagenet_templates: bool=False) -> None:
+    def __init__(self, device: str) -> None:
+        """Instantiates a new BLIP caption generator
+
+        Args:
+            device (str): Device to run BLIP on
+        """
+
+        from lavis.models import load_model_and_preprocess
+
+        self.device = device
+        self.blip, self.blip_preproc, _ = load_model_and_preprocess(name="blip_caption", model_type="base_coco",
+                                                              is_eval=True, device=self.device)
+
+    def __call__(self, image: Image.Image) -> str:
+        """Creates a caption for the provided image
+
+        Args:
+            image (Image.Image): Image to generate a caption for.
+
+        Returns:
+            str: Caption
+        """
+
+        blip_input_image = self.blip_preproc["eval"](image).unsqueeze(0).to(self.device)
+        blip_caption = self.blip.generate({"image": blip_input_image})[0]
+        return blip_caption
+
+
+class CLIPSimilarity(SimpleMetric):
+    """CLIP similarity for image-text similarity. Higher is better. Except for directional metric, ranges from 1 (best) to 0 (worst)."""
+
+    def __init__(self, input_range: Tuple[int, int]=(-1, 1), device: Optional[str]=None, use_imagenet_templates: bool=False, metric: str="text_img", clip_model: str="ViT-B/16") -> None:
         """Initializes a new CLIP similarity metric.
 
         Args:
             input_range (Tuple[int, int], optional): Input range for image tensors needed for normalization. Defaults to (-1, 1).
             device (Optional[str], optional): Device to compute the metric on. Defaults to None.
             use_imagenet_templates (bool, optional): If True CLIP text embeddings will be averaged over 80 imagenet templates. Defaults to False.
+            metric (str, optional): Which CLIP metric to compute. Available metrics are ("text_img", "img_img", "text_text", "textdir_imgdir"). Defaults to "text_img".
+            clip_model (str, optional): Which CLIP model to use. Defaults to "ViT-B/16".
         """
+
+        assert metric in ("text_img", "img_img", "text_text", "textdir_imgdir")
 
         super().__init__(input_range, device)
         import clip
 
         # load clip
-        self.model, self.preprocess = clip.load("ViT-B/16", self.device)
+        self.model, self.preprocess = clip.load(clip_model, self.device)
+        self.model.eval()
+
         self.templates = imagenet_templates if use_imagenet_templates else ["{}"]
         self.losses = []
 
-    def forward(self, pred: torch.Tensor, target: str) -> torch.Tensor:
+        self.metric = metric
+
+        # load BLIP if needed (for text-text similarity)
+        self.gen_caption = BLIPCaptionGenerator(self.device) if metric == "text_text" else None
+
+    def get_img_feat(self, image: Image.Image) -> torch.Tensor:
+        """Computes normalized CLIP image features
+
+        Args:
+            image (Image.Image): Image to compute features for.
+
+        Returns:
+            torch.Tensor: Image feature
+        """
+
+        image_preproc = self.preprocess(image).unsqueeze(0).to(self.device)
+
+        # encode image and normalize embedding
+        feat = self.model.encode_image(image_preproc)
+        feat /= feat.norm(dim=-1, keepdim=True)
+        feat = feat.float()
+        feat = feat.squeeze(0)
+
+        return feat
+    
+    def get_text_feat(self, text: str) -> torch.Tensor:
+        """Computes normalized CLIP text features.
+
+        Args:
+            text (str): Text to compute features for.
+
+        Returns:
+            torch.Tensor: Text features
+        """
+
+        return get_embedding_for_prompt(self.model, text, templates=self.templates)
+
+    def torch_to_pil(self, image: Optional[torch.Tensor]) -> Union[Image.Image, None]:
+        """Converts a tensor image to a PIL image.
+
+        Args:
+            image (Optional[torch.Tensor]): Tensor to convert.
+
+        Returns:
+            Union[Image.Image, None]: PIL image
+        """
+
+        if image is None:
+            return None
+
+        image = self._normalize(image)[0].permute(1, 2, 0).detach().cpu().numpy()
+        image = np.clip(image  * 255, 0, 255).astype(np.uint8)
+        image = Image.fromarray(image)
+        return image
+
+    def forward(self, source_image: Optional[torch.Tensor]=None, target_image: Optional[torch.Tensor]=None, source_prompt: Optional[str]=None, target_prompt: Optional[str]=None) -> torch.Tensor:
         """Compute metric value for a single example.
 
         Args:
-            pred (torch.Tensor): Output image
-            target (torch.Tensor): Target prompt
+            source_image (Optional[torch.Tensor], optional): Groundtruth input image (0-1 range). Defaults to None.
+            target_image (Optional[torch.Tensor], optional): Output image (0-1 range). Defaults to None.
+            source_prompt (Optional[str], optional): Prompt used for inversion. Defaults to None.
+            target_prompt (Optional[str], optional): Prompt used for editing. Defaults to None.
 
         Returns:
             torch.Tensor: Metric value (1 best, 0 worst)
         """
 
-        image, prompt = pred, target
+        source_image = self.torch_to_pil(source_image)
+        target_image = self.torch_to_pil(target_image)
 
-        # image = self._normalize(image)
-        if not isinstance(image, np.ndarray):
-            image = np.clip((self._normalize(image)[0].permute(1, 2, 0)).detach().cpu().numpy() * 255, 0, 255).astype(np.uint8)
-
-        image = Image.fromarray(image)
-        image_preproc = self.preprocess(image).unsqueeze(0).to(self.device)
-
-        # encode prompt
-        text_feat = get_embedding_for_prompt(self.model, prompt, templates=self.templates)
-
-        # encode image and normalize embedding
-        img_feat = self.model.encode_image(image_preproc)
-        img_feat /= img_feat.norm(dim=-1, keepdim=True)
+        if self.metric == "text_img":
+            a = self.get_img_feat(target_image)
+            b = self.get_text_feat(target_prompt)
+        elif self.metric == "img_img":
+            a = self.get_img_feat(source_image)
+            b = self.get_img_feat(target_image)
+        elif self.metric == "textdir_imgdir":
+            a = self.get_img_feat(target_image) - self.get_img_feat(source_image)
+            b = self.get_text_feat(target_prompt) - self.get_text_feat(source_prompt)
+        elif self.metric == "text_text":
+            pred_prompt = self.gen_caption(target_image)
+            a = self.get_text_feat(pred_prompt)
+            b = self.get_text_feat(target_prompt)
 
         # dot product
-        sim = (img_feat.float() @ text_feat.T)
+        assert a.ndim == 1 and a.shape == b.shape
+        sim = torch.dot(a, b)
 
         return sim
 
     def __repr__(self) -> str:
-        return "clip"
+        return f"clip_{self.metric}"
 
 
 class CLIPAccuracy(SimpleMetric):
@@ -187,28 +285,40 @@ class CLIPAccuracy(SimpleMetric):
     The final metric is the ratio of corectly edited images by the total number of images.
     """
 
-    def __init__(self, input_range: Tuple[int, int]=(-1, 1), device: Optional[str]=None) -> None:
+    def __init__(self, input_range: Tuple[int, int]=(-1, 1), device: Optional[str]=None, 
+                 use_imagenet_templates: bool=False, metric: str="text_img", clip_model: str="ViT-B/16") -> None:
+        """Initializes a new CLIP accuracy metric.
+
+        Args:
+            input_range (Tuple[int, int], optional): Input range for image tensors needed for normalization. Defaults to (-1, 1).
+            device (Optional[str], optional): Device to compute the metric on. Defaults to None.
+            use_imagenet_templates (bool, optional): If True CLIP text embeddings will be averaged over 80 imagenet templates. Defaults to False.
+            metric (str, optional): Which CLIP metric to compute. Available metrics are ("text_img", "img_img", "text_text", "textdir_imgdir"). Defaults to "text_img".
+            clip_model (str, optional): Which CLIP model to use. Defaults to "ViT-B/16".
+        """
+
         super().__init__(input_range, device)
 
-        self.clip_sim = CLIPSimilarity(input_range, device)
+        self.clip_sim = CLIPSimilarity(input_range, device, use_imagenet_templates, metric, clip_model)
 
-    def forward(self, image: torch.Tensor, source_prompt: str, target_prompt: str) -> torch.Tensor:
+    def forward(self, source_image: Optional[torch.Tensor]=None, target_image: Optional[torch.Tensor]=None, source_prompt: Optional[str]=None, target_prompt: Optional[str]=None) -> torch.Tensor:
         """Compute metric value for a single example.
 
         Args:
-            image (torch.Tensor): Source image/dited output image
-            source_prompt (str): Prompt used for inversion.
-            target_prompt (str): Prompt used for editing/denoising.
+            source_image (Optional[torch.Tensor], optional): Groundtruth input image (0-1 range). Defaults to None.
+            target_image (Optional[torch.Tensor], optional): Output image (0-1 range). Defaults to None.
+            source_prompt (Optional[str], optional): Prompt used for inversion. Defaults to None.
+            target_prompt (Optional[str], optional): Prompt used for editing. Defaults to None.
 
         Returns:
-            torch.Tensor: Metric value (1 best, 0 worst)
+            torch.Tensor: Metric value (1-best or 0-worst)
         """
         
-        sim_src = self.clip_sim(image, source_prompt)
-        sim_target = self.clip_sim(image, target_prompt)
+        sim_src = self.clip_sim(target_image=target_image, source_prompt=source_prompt)
+        sim_target = self.clip_sim(target_image=target_image, target_prompt=target_prompt)
         val = sim_target > sim_src
 
         return val.float()
 
     def __repr__(self) -> str:
-        return "clip_acc"
+        return f"{self.clip_sim}_acc"

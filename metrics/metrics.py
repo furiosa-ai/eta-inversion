@@ -1,7 +1,7 @@
 
 import torch
 from .base import SimpleMetric
-from typing import Tuple
+from typing import Optional, Tuple
 
 
 # class MSEMetric(SimpleMetric):
@@ -41,8 +41,8 @@ class LPIPSMetric(SimpleMetric):
     """LPIPS metric. Lower means better. 
     """
 
-    def __init__(self, input_range: Tuple[int, int]=(-1, 1)) -> None:
-        super().__init__(input_range)
+    def __init__(self, input_range: Tuple[int, int]=(-1, 1), device: Optional[str]=None) -> None:
+        super().__init__(input_range, device)
 
         self.crit_lpips = None
 

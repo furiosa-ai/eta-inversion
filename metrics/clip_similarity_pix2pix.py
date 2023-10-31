@@ -72,26 +72,26 @@ class ClipSimilarityPix2Pix(SimpleMetric):
         image_features = image_features / image_features.norm(dim=1, keepdim=True)
         return image_features
 
-    def forward(self, image_0: torch.Tensor, image_1: torch.Tensor, text_0: list[str], text_1: list[str]) -> torch.Tensor:
+    def forward(self, source_image: torch.Tensor, target_image: torch.Tensor, source_prompt: str, target_prompt: str) -> torch.Tensor:
         """Computes metric value as (clip(output_image) - clip(source_image)) @ (clip(target_prompt) - clip(source_prompt)).
 
         Args:
-            image_0 (torch.Tensor): Source image
-            image_1 (torch.Tensor): Output image
-            text_0 (list[str]): Source prompt
-            text_1 (list[str]): Target prompt
+            source_image (torch.Tensor): Source image
+            target_image (torch.Tensor): Output image
+            source_prompt (str): Source prompt
+            target_prompt (str): Target prompt
 
         Returns:
             torch.Tensor: Metric value
         """
 
-        image_0 = self._normalize(image_0)
-        image_1 = self._normalize(image_1)
+        source_image = self._normalize(source_image)
+        target_image = self._normalize(target_image)
 
-        image_features_0 = self.encode_image(image_0)
-        image_features_1 = self.encode_image(image_1)
-        text_features_0 = self.encode_text(text_0)
-        text_features_1 = self.encode_text(text_1)
+        image_features_0 = self.encode_image(source_image)
+        image_features_1 = self.encode_image(target_image)
+        text_features_0 = self.encode_text(source_prompt)
+        text_features_1 = self.encode_text(target_prompt)
         # sim_0 = F.cosine_similarity(image_features_0, text_features_0)
         # sim_1 = F.cosine_similarity(image_features_1, text_features_1)
         sim_direction = F.cosine_similarity(image_features_1 - image_features_0, text_features_1 - text_features_0)
