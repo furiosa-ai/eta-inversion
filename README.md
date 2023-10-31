@@ -57,8 +57,7 @@ A PyTorch implementation of diffusion inversion & editing benchmark
 
 
 ### Methods
-
-|                                                 | [Simple](docs/ldm.md) | [Prompt-to-Prompt](docs/ptp.md) | [Plug-and-Play](docs/pnp.md) | [MasaCtrl](docs/proxnpi.md) | [pix2pix-zero](docs/p2p-zero.md) | [DDS](docs/dds.md) |
+| Inversion / Edit method                         | [Simple](docs/ldm.md) | [Prompt-to-Prompt](docs/ptp.md) | [Plug-and-Play](docs/pnp.md) | [MasaCtrl](docs/proxnpi.md) | [pix2pix-zero](docs/p2p-zero.md) | [DDS](docs/dds.md) |
 |-------------------------------------------------|:---------------------:|:-------------------------------:|:----------------------------:|:---------------------------:|:--------------------------------:|:------------------:|
 | [DDIM Inversion](docs/ddim.md)                  | [x]                   | [x]                             | [x]                          | [x]                         | [x]                              | [ ]                |
 | [NTI](docs/nti.md)                              | [x]                   | [x]                             | [x]                          | [x]                         | [x]                              | [ ]                |
