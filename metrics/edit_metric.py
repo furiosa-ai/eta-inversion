@@ -2,14 +2,11 @@ import torch
 import numpy as np
 from functools import partial
 from .clip_similarity import CLIPSimilarity
-from .blip_clip_similarity import BLIPCLIPSimilarity
-from .blip_clip_similarity import BLIPCLIPAccuracy
 from .clip_similarity import CLIPAccuracy
 from .dino_vit_structure import DinoVitStructure
 from .metrics import LPIPSMetric
 from .nslpips import NSLPIPS
 from .bglpips import BGLPIPS
-from .clip_similarity_pix2pix import ClipSimilarityPix2Pix
 from .ssim import SSIM
 from .msssim import MSSSIM
 from .base import SimpleMetric
@@ -33,21 +30,12 @@ class EditMetric(SimpleMetric):
 
         self.metric_name = name
         self.metric = {
-            # legacy clip metrics
-            "clip": CLIPSimilarity,
-            "blipclip": partial(CLIPSimilarity, metric="text_text"),
-            "clip_pix2pix": ClipSimilarityPix2Pix,
-            "clip_acc": CLIPAccuracy,
-            "blipclip_acc": BLIPCLIPAccuracy,
-
-            # TODO: replace with new clip metrics
             "clip_text_img": partial(CLIPSimilarity, metric="text_img"),
             "clip_img_img": partial(CLIPSimilarity, metric="img_img"),
             "clip_text_text": partial(CLIPSimilarity, metric="text_text"),
             "clip_textdir_imgdir": partial(CLIPSimilarity, metric="textdir_imgdir"),
             "clip_text_img_acc": partial(CLIPAccuracy, metric="text_img"),
             "clip_text_text_acc": partial(CLIPAccuracy, metric="text_text"),
-
             "dinovitstruct": DinoVitStructure,
             "dinovitstruct_v2": partial(DinoVitStructure, vit_model="dinov2_vitb14"),
             "lpips": LPIPSMetric,
@@ -65,19 +53,12 @@ class EditMetric(SimpleMetric):
             List[str]: Metric list
         """
         return [
-            "clip",
-            "blipclip",
-            "clip_pix2pix",
-            "clip_acc",
-            "blipclip_acc",
-
-            # "clip_text_img",
-            # "clip_img_img",
-            # "clip_text_text",
-            # "clip_textdir_imgdir",
-            # "clip_text_img_acc",
-            # "clip_text_text_acc",
-
+            "clip_text_img",
+            "clip_img_img",
+            "clip_text_text",
+            "clip_textdir_imgdir",
+            "clip_text_img_acc",
+            "clip_text_text_acc",
             "dinovitstruct",
             "dinovitstruct_v2",
             "lpips",
@@ -105,10 +86,6 @@ class EditMetric(SimpleMetric):
 
         # select required arguments for respective metric
         args = {
-            "clip": dict(target_image=edit_image, target_prompt=target_prompt),
-            "clip_pix2pix": dict(source_image=source_image, target_image=edit_image, 
-                                 source_prompt=source_prompt, target_prompt=target_prompt),
-            "blipclip_acc": (edit_image, source_prompt, target_prompt),
             "dinovitstruct": (source_image, edit_image),
             "dinovitstruct_v2": (source_image, edit_image),
             "lpips": (source_image, edit_image),

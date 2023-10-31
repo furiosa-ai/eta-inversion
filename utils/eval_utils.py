@@ -91,7 +91,7 @@ class EditResultData:
 
     def __init__(self, data_name: str, method: Dict[str, Any], edit_method: Dict[str, Any], 
                  edit_cfg: Dict[str, Any]=None, exp_name: Optional[str]=None, path: Optional[str]=None, 
-                 skip_existing=True, **kwargs) -> None:
+                 skip_existing=False, **kwargs) -> None:
         """Initialies a new dataset for evaluation.
 
         Args:

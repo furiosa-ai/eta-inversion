@@ -131,7 +131,8 @@ def main(cfg: Optional[List[str]], metric: List[str]) -> None:
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cfg", nargs="+", help="Config file(s) for evaluation.")
-    parser.add_argument("--metric", nargs="+", help="Metric(s) to compute. If not specified, all metrics are computed.")
+    parser.add_argument("--metric", nargs="+", help="Metric(s) to compute. If not specified, all metrics are computed.", 
+                        choices=EditMetric.get_available_metrics(), metavar="")
     args = parser.parse_args()
     return vars(args)
 

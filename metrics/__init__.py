@@ -3,7 +3,6 @@
 # from .metrics import PSNRMetric
 from .metrics import LPIPSMetric
 from .clip_similarity import CLIPSimilarity
-from .blip_clip_similarity import BLIPCLIPSimilarity
 from .dino_vit_structure import DinoVitStructure
 
 

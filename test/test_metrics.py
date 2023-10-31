@@ -28,21 +28,6 @@ class TestMetrics(unittest.TestCase):
     """
 
     # metrics to test
-    # metrics = [
-    #     "clip",
-    #     "clip_acc",
-    #     "blipclip",
-    #     "blipclip_acc",
-    #     "dinovitstruct",
-    #     "dinovitstruct_v2",
-    #     "clip_pix2pix",
-    #     "lpips",
-    #     "nslpips",
-    #     "bglpips",
-    #     "ssim",
-    #     "msssim",
-    # ]
-
     metrics = EditMetric.get_available_metrics()
 
     device = "cuda"
@@ -50,7 +35,7 @@ class TestMetrics(unittest.TestCase):
     # image input and target metric values
     test_cat = "cat"
     test_data = {
-        'cat': {
+        "cat": {
             "data": {
                 "source_image": "test/data/gnochi_mirror_sq.png",
                 "edit_image": "test/data/gnochi_mirror_sq_edit_example.png",
@@ -60,18 +45,19 @@ class TestMetrics(unittest.TestCase):
                 "mask": "test/data/gnochi_mirror_sq_mask.png",
             },
             "metrics": {
-                'clip': 0.32212701439857483, 
-                'clip_acc': 1.0, 
-                'blipclip': 0.9205214381217957, 
-                'blipclip_acc': 1.0, 
-                'dinovitstruct': 0.018216347321867943, 
-                'dinovitstruct_v2': 0.003991228528320789, 
-                'clip_pix2pix': 0.1885986328125, 
-                'lpips': 0.24533388018608093, 
-                'nslpips': 0.22590836882591248, 
-                'bglpips': 0.0347834937274456, 
-                'ssim': 0.6813936829566956,
-                'msssim': 0.7749947905540466,
+                "clip_text_img": 0.32212701439857483,
+                "clip_img_img": 0.6910541653633118,
+                "clip_text_text": 0.9205214381217957,
+                "clip_textdir_imgdir": 0.1089695394039154,
+                "clip_text_img_acc": 1.0,
+                "clip_text_text_acc": 1.0,
+                "dinovitstruct": 0.018216347321867943, 
+                "dinovitstruct_v2": 0.003991228528320789, 
+                "lpips": 0.24533388018608093, 
+                "nslpips": 0.22590836882591248, 
+                "bglpips": 0.0347834937274456, 
+                "ssim": 0.6813936829566956,
+                "msssim": 0.7749947905540466,
             }
         }
     }
@@ -196,18 +182,19 @@ class TestMetrics(unittest.TestCase):
         """
 
         def test_func(self):
-            target_loss = self.test_data[cat]["metrics"][metric]
-
             output_loss = self.metric_helper(
                 metric,
                 **self.test_data[cat]["data"]
             )
 
+            target_loss = self.test_data[cat]["metrics"].get(metric, None)
+
+            self.assertIsNotNone(target_loss, f"No test data found. Output metric is {output_loss}.")
             self.assert_mean_almost_equal(output_loss, target_loss)
         return test_func
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     with torch.no_grad():
         if len(sys.argv) >= 2 and sys.argv[1] == "gen":
             # generate target data
