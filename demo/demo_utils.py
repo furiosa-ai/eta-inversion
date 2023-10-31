@@ -293,6 +293,9 @@ class Demo:
                     
                     if editor == "masactrl":
                         with gr.Row():
+                            self.inputs[f"{k}.no_null_source_prompt"] = gr.Checkbox(
+                                label="Use source prompt", value=False, info="By default MasaCtrl does not use source prompt for inversion.")
+
                             self.inputs[f"{k}.step"] = gr.Number(
                                 label="Step", value=4, precision=0)
                             

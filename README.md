@@ -4,8 +4,8 @@ A PyTorch implementation of diffusion inversion & editing benchmark
 
 ## TODO :memo:
 - [ ] Release technical report
-- [ ] Release full code
-- [ ] Release benchmark results
+- [x] Release full code
+- [x] Release benchmark results
 - [ ] Release document
 
 ## Table of Contents
@@ -43,20 +43,34 @@ A PyTorch implementation of diffusion inversion & editing benchmark
 <details><summary> <strong> Real </strong> </summary>
 
 - [x] [ImageNet-R-TI2I](/docs/pnp.md#datasets)
-- [ ] [Wild-TI2I](/docs/pnp.md#datasets)
-- [ ] [PIE-Bench]()
+- [x] [Wild-TI2I](/docs/pnp.md#datasets)
+- [x] [PIE-Bench]()
 </details>
 
 <details><summary> <strong> Generated </strong> </summary>
 
 - [x] [Prompt-to-Prompt dataset](/docs/ptp.md#datasets)
 - [x] [ImageNet-R-fake-TI2I](/docs/pnp.md#datasets)
-- [ ] [Wild-fake-TI2I](/docs/pnp.md#datasets)
+- [x] [Wild-fake-TI2I](/docs/pnp.md#datasets)
 - [ ] [InstructPix2Pix dataset](/docs/ip2p.md#datasets)
 </details>
 
 
 ### Methods
+
+|                                                 | [Simple](docs/ldm.md) | [Prompt-to-Prompt](docs/ptp.md) | [Plug-and-Play](docs/pnp.md) | [MasaCtrl](docs/proxnpi.md) | [pix2pix-zero](docs/p2p-zero.md) | [DDS](docs/dds.md) |
+|-------------------------------------------------|:---------------------:|:-------------------------------:|:----------------------------:|:---------------------------:|:--------------------------------:|:------------------:|
+| [DDIM Inversion](docs/ddim.md)                  | [x]                   | [x]                             | [x]                          | [x]                         | [x]                              | [ ]                |
+| [NTI](docs/nti.md)                              | [x]                   | [x]                             | [x]                          | [x]                         | [x]                              | [ ]                |
+| [NPI](docs/npi.md)                              | [x]                   | [x]                             | [x]                          | [x]                         | [x]                              | [ ]                |
+| [ProxNPI](docs/proxnpi.md)                      | [x]                   | [x]                             | [x]                          | [x]                         | [x]                              | [ ]                |
+| [EDICT](docs/edict.md)                          | [x]                   | [x]                             | [ ]                          | [x]                         | [x]                              | [ ]                |
+| [Edit Friendly DDPM Inversion](docs/ddpminv.md) | [x]                   | [x]                             | [x]                          | [x]                         | [x]                              | [ ]                |
+| [CycleDiffusion](docs/cyclediff.md)             | [ ]                   | [ ]                             | [ ]                          | [ ]                         | [ ]                              | [ ]                |
+| [BDIA](docs/bdia.md)                            | [ ]                   | [ ]                             | [ ]                          | [ ]                         | [ ]                              | [ ]                |
+| [StyleDiffusion](docs/stylediff.md)             | [ ]                   | [ ]                             | [ ]                          | [ ]                         | [ ]                              | [ ]                |
+| [AIDI](docs/aidi.md)                            | [ ]                   | [ ]                             | [ ]                          | [ ]                         | [ ]                              | [ ]                |
+
 
 <details><summary> <strong> Inversion </strong> </summary>
 
@@ -92,7 +106,7 @@ A PyTorch implementation of diffusion inversion & editing benchmark
 - [x] [MSE](/docs/metrics.md#mean-squared-error-mse)
 - [x] [PSNR](/docs/metrics.md#peak-signal-to-noise-ratio-psnr)
 - [x] [LPIPS](/docs/metrics.md#learned-perceptual-image-patch-similarity-lpips)
-- [ ] [SSIM](/docs/metrics.md#structural-similarity-index-measure-ssim)
+- [x] [SSIM](/docs/metrics.md#structural-similarity-index-measure-ssim)
 <!--
 - [ ] [~~FID~~](/docs/metrics.md#fréchet-inception-distance-fid)
 -->
@@ -102,7 +116,7 @@ A PyTorch implementation of diffusion inversion & editing benchmark
   
 - [x] CLIP similarity
   - [x] [Text<sub>tar</sub> - Image<sub>tar</sub>](/docs/metrics.md#texttar---imagetar-clip-similarity)
-  - [ ] [Image<sub>src</sub> - Image<sub>tar</sub>](/docs/metrics.md#imagesrc---imagetar-clip-similarity)
+  - [x] [Image<sub>src</sub> - Image<sub>tar</sub>](/docs/metrics.md#imagesrc---imagetar-clip-similarity)
   - [x] [Text<sub>tar</sub> - caption from BLIP(Image<sub>tar</sub>)](/docs/metrics.md#texttar---caption-from-blipimagetar-clip-similarity)
 - [x] [directional CLIP similarity](/docs/metrics.md#directional-clip-similarity)
 - [x] [CLIP accuracy](/docs/metrics.md#clip-accuracy)
@@ -110,8 +124,8 @@ A PyTorch implementation of diffusion inversion & editing benchmark
 - [x] [DINOv2](https://github.com/facebookresearch/dinov2)
 - [x] [LPIPS](/docs/metrics.md#lpips)
 - [x] [NS-LPIPS](/docs/metrics.md#ns-lpips)
-- [ ] [BG-LPIPS](/docs/metrics.md#bg-lpips)
-- [ ] [MS-SSIM](https://github.com/VainF/pytorch-msssim)
+- [x] [BG-LPIPS](/docs/metrics.md#bg-lpips)
+- [x] [MS-SSIM](https://github.com/VainF/pytorch-msssim)
 - [ ] [~~FID~~](/docs/metrics.md#fréchet-inception-distance-fid)[^2]
 <!--
 - [x] BLIP accuracy
