@@ -111,7 +111,10 @@ class PromptToPromptControllerAttentionStore(PromptToPromptControllerBase):
 
         attention_maps = ptp.aggregate_attention([None], self.controller, res, from_where, True, 0)
 
-        mask_idx = prompt.split(' ').index(word) + 1 # +1 for start token
+        try:
+            mask_idx = prompt.split(' ').index(word) + 1 # +1 for start token
+        except ValueError:
+            raise Exception(f"Cannot get attention map. Word {word} not in {prompt}")
 
         attention_map = attention_maps[:, :, mask_idx]
         attention_map = attention_map[None]

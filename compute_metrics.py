@@ -13,6 +13,7 @@ from utils.eval_utils import EditResultData
 from modules import StablePreprocess
 
 from typing import List, Optional, Dict, Any
+import gc
 
 
 def run_compute_metric(metric: EditMetric, eval_dir: Path, path: str, data: str, method: Dict[str, Any], edit_method: Dict[str, Any], edit_cfg: Dict[str, Any]) -> None:
@@ -62,6 +63,8 @@ def run_compute_metric(metric: EditMetric, eval_dir: Path, path: str, data: str,
                 source_image = None
 
         if source_image is not None and Path(sample["edit_image_file"]).exists():
+            gc.collect()
+            torch.cuda.empty_cache()
             # if source image and output image exists
 
             # some metrics need the edited word as argument -> grab from prompt-to-prompt config
@@ -73,13 +76,16 @@ def run_compute_metric(metric: EditMetric, eval_dir: Path, path: str, data: str,
                 edit_word = None
 
             # add example to metric
-            loss = metric.update(
-                source_image=preproc(source_image), 
-                edit_image=preproc(sample["edit_image_file"]), 
-                source_prompt=sample["source_prompt"], 
-                target_prompt=sample["edit"]["target_prompt"],
-                edit_word=edit_word,
-                mask=sample.get("mask", None))
+            try:
+                loss = metric.update(
+                    source_image=preproc(source_image), 
+                    edit_image=preproc(sample["edit_image_file"]), 
+                    source_prompt=sample["source_prompt"], 
+                    target_prompt=sample["edit"]["target_prompt"],
+                    edit_word=edit_word,
+                    mask=sample.get("mask", None))
+            except Exception as e:
+                print(f"Skipping {image_file} because of {e}")
 
             # record loss for each example
             metric_res.append({
