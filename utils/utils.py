@@ -32,6 +32,7 @@ def add_argparse_arg(parser: argparse.ArgumentParser, name: str) -> None:
                 "proxnpi": "Proximal negative prompt inversion",
                 "edict": "EDICT inversion",
                 "ddpminv": "DDPM inversion",
+                "dirinv": "Direct inversion",
         }},
         "edit_method": {
             "title": "Available editing methods:",

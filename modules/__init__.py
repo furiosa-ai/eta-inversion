@@ -6,6 +6,7 @@ from .inversion.negative_prompt_inversion import NegativePromptInversion
 from .inversion.proximal_negative_prompt_inversion import ProximalNegativePromptInversion
 from .inversion.edict_inversion import EdictInversion
 from .inversion.ddpm_inversion import DDPMInversion
+from .inversion.direct_inversion import DirectInversion
 
 from .editing.simple_editor import SimpleEditor
 from .editing.ptp_editor import PromptToPromptEditor
@@ -30,6 +31,7 @@ _inverters = {
     "proxnpi": ProximalNegativePromptInversion,
     "edict": EdictInversion,
     "ddpminv": DDPMInversion,
+    "dirinv": DirectInversion,
 }
 
 
