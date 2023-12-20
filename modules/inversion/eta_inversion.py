@@ -82,7 +82,7 @@ class EtaInversion(DiffusionInversion):
             torch.Tensor: Stacked variance noise tensor.
         """
 
-        return torch.randn((n, 1, 4, 64, 64), generator=generator, device=self.model.device)
+        return torch.randn((n, 1, 4, 64, 64), generator=generator, device=self.model.device).to(self.model.unet.dtype)
 
     def predict_step_backward(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale_bwd: Optional[float]=None, 
                               source_latent_prev: Optional[torch.Tensor]=None, generator: Optional[torch.Generator]=None) -> Tuple[torch.Tensor, torch.Tensor]:

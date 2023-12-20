@@ -8,7 +8,7 @@ from pathlib import Path
 import cv2
 import argparse
 
-from modules import load_inverter, load_editor
+from modules import load_diffusion_model, load_inverter, load_editor
 from modules.inversion.diffusion_inversion import DiffusionInversion
 from modules import StablePreprocess, StablePostProc
 from diffusers import StableDiffusionPipeline
@@ -59,8 +59,8 @@ def get_edit_word(source_prompt: str, target_prompt: str) -> Tuple[str, str]:
 
 
 @torch.no_grad()
-def main(input: str, src_prompt: str, target_prompt: str, output: str, inv_method: str, edit_method: str, 
-         scheduler: str, steps: int, guidance_scale_bwd: float, guidance_scale_fwd: float, edit_cfg: str) -> None:
+def main(input: str, model: str, src_prompt: str, target_prompt: str, output: str, inv_method: str, edit_method: str, 
+         scheduler: str, steps: int, guidance_scale_bwd: float, guidance_scale_fwd: float, edit_cfg: str, prec: str) -> None:
     enable_deterministic()
 
     input = Path(input)
@@ -72,9 +72,7 @@ def main(input: str, src_prompt: str, target_prompt: str, output: str, inv_metho
     device = "cuda"
 
     # load models
-    ldm_stable = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4").to(device)
-    preproc = StablePreprocess(device, size=512, center_crop=True, return_np=False, pil_resize=True)
-    postproc = StablePostProc()
+    ldm_stable, (preproc, postproc) = load_diffusion_model(model, device, variant=prec)
 
     if edit_cfg is None:
         # Using a default config for prompt-to-prompt if no edit_cfg yaml is specified
@@ -132,6 +130,7 @@ def main(input: str, src_prompt: str, target_prompt: str, output: str, inv_metho
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, description="Edits a single image.")
     parser.add_argument("--input", required=True, help="Path to image to invert.")
+    parser.add_argument("--model", default="CompVis/stable-diffusion-v1-4", help="Diffusion Model.")
     parser.add_argument("--src_prompt", required=True, help="Prompt to use for inversion.")
     parser.add_argument("--target_prompt", required=True, help="Prompt to use for inversion.")
     parser.add_argument("--output", help="Path for output image.")
@@ -142,6 +141,7 @@ def parse_args():
     parser.add_argument("--steps", type=int, help="How many diffusion steps to use.")
     parser.add_argument("--guidance_scale_bwd", type=int, help="Classifier free guidance scale to use for backward diffusion (denoising).")
     parser.add_argument("--guidance_scale_fwd", type=int, help="Classifier free guidance scale to use for forward diffusion (inversion).")
+    parser.add_argument("--prec", choices=["fp16", "fp32"], help="Precision for diffusion.")
     args = parser.parse_args()
     return vars(args)
 

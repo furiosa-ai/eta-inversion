@@ -41,7 +41,7 @@ class LocalBlend:
             if self.substruct_layers is not None:
                 maps_sub = ~self.get_mask(maps, self.substruct_layers, False)
                 mask = mask * maps_sub
-            mask = mask.float()
+            mask = mask.to(x_t.dtype)
             # print("xt mask", x_t.shape, mask.shape)
             x_t = x_t[:1] + mask * (x_t - x_t[:1])
         return x_t

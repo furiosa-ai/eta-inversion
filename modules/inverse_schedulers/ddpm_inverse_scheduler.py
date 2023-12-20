@@ -105,13 +105,13 @@ class DDPMInverseScheduler(DiffusionInverseScheduler):
         timesteps = self.scheduler.timesteps.to(latent.device)
 
         # allocate tensor for all intermediate results
-        xts = torch.zeros(variance_noise_shape).to(latent.device)
+        xts = torch.zeros(variance_noise_shape, dtype=latent.dtype).to(latent.device)
 
         cur_latent = latent
         for t in reversed(timesteps):
             # for every timestep, sample random gaussian noise and add it to the latent according to the noise schedule
             idx = self.t_to_idx[int(t)]
-            r = torch.randn(latent.shape, device=latent.device, generator=generator)
+            r = torch.randn(latent.shape, device=latent.device, generator=generator).to(latent.dtype)
 
             if not self.markovian_forward:
                 # sample from x_0

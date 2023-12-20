@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 from typing import Any, Callable, Dict
+from modules.models import load_diffusion_model
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -14,9 +15,7 @@ import torch
 import cv2
 import yaml
 import json
-from diffusers import StableDiffusionPipeline
 from modules import load_editor, load_inverter
-from modules import StablePreprocess, StablePostProc
 
 
 class TestEdit(unittest.TestCase):
@@ -49,8 +48,8 @@ class TestEdit(unittest.TestCase):
         dict(type="proxnpi", scheduler="ddim", num_inference_steps=steps),
         dict(type="edict", scheduler="ddim", num_inference_steps=steps),
         dict(type="ddpminv", scheduler="ddpm", num_inference_steps=steps),
-
-        dict(type="diffinv_delta", scheduler="ddim", num_inference_steps=steps, delta_type="latent", mod_src=True),
+        dict(type="dirinv", scheduler="ddim", num_inference_steps=steps),
+        dict(type="etainv", scheduler="ddim", num_inference_steps=steps),
     ]
 
     # edit methods to test
@@ -88,16 +87,23 @@ class TestEdit(unittest.TestCase):
         "edict_ddim_50__simple": -0.015604550018906593,
         "edict_ddim_50__ptp": -0.02095811814069748,
         "edict_ddim_50__masactrl": -0.012362940236926079,
+        "edict_ddim_50__pnp": 0.0,
         "edict_ddim_50__pix2pix_zero": 0.0015177088789641857,
         "ddpminv_ddpm_50__simple": -0.02269146963953972,
         "ddpminv_ddpm_50__ptp": -0.03735125809907913,
         "ddpminv_ddpm_50__masactrl": -0.020472053438425064,
         "ddpminv_ddpm_50__pnp": -0.008612200617790222,
         "ddpminv_ddpm_50__pix2pix_zero": -0.006461526267230511,
-        
-        "diffinv_delta_ddim_50_latent_True__simple": -0.10673341155052185,
-        "diffinv_delta_ddim_50_latent_True__ptp": -0.06059194356203079,
-        "diffinv_delta_ddim_50_latent_True__masactrl": -0.05143100023269653,
+        "dirinv_ddpm_50__simple": 0.0,
+        "dirinv_ddpm_50__ptp": 0.0,
+        "dirinv_ddpm_50__masactrl": 0.0,
+        "dirinv_ddpm_50__pnp": 0.0,
+        "dirinv_ddpm_50__pix2pix_zero": 0.0,
+        "etainv_ddpm_50__simple": 0.0,
+        "etainv_ddpm_50__ptp": 0.0,
+        "etainv_ddpm_50__masactrl": 0.0,
+        "etainv_ddpm_50__pnp": 0.0,
+        "etainv_ddpm_50__pix2pix_zero": 0.0,
     }
 
     # TestEdit.test_diffinv_ddim_50__pix2pix_zero_equal TestEdit.test_ddpminv_ddpm_50__pix2pix_zero_equal
@@ -126,11 +132,9 @@ class TestEdit(unittest.TestCase):
             cls.edit_cfgs[name] = {"inversion": inversion_method, "edit": edit_method}
 
         cls.save_image_path = Path("result/test")
-        cls.device = "cuda"
+        cls.device = "cuda" 
 
-        cls.model = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4").to(cls.device)
-        cls.preproc = StablePreprocess(cls.device, size=512, **{"center_crop": True, "return_np": False})
-        cls.postproc = StablePostProc()
+        cls.model, (cls.preproc, cls.postproc) = load_diffusion_model("CompVis/stable-diffusion-v1-4", cls.device, variant="fp32", preproc_args={"center_crop": True, "return_np": False})
 
     @classmethod
     def edit_helper(cls, edit_config: Dict[str, Any], image: str, source_prompt: str, 

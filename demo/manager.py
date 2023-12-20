@@ -4,8 +4,7 @@ enable_deterministic()
 import torch
 
 from modules import load_inverter, load_editor
-from modules import StablePreprocess, StablePostProc
-from diffusers import StableDiffusionPipeline
+from modules import load_diffusion_model
 from typing import Dict, Any, List
 
 
@@ -152,9 +151,7 @@ class EditorManager:
 
         # reload components if config changed
         if not dict_equal(cfg["model"], self.cfg.get("model", None)):
-            self.model = StableDiffusionPipeline.from_pretrained(cfg["model"]["type"]).to(self.device)
-            self.preproc = StablePreprocess(self.device, size=512, center_crop=True, return_np=False, pil_resize=True)
-            self.postproc = StablePostProc()
+            self.model, (self.preproc, self.postproc) = load_diffusion_model(**cfg["model"], device=self.device, preproc_args=dict(center_crop=True, return_np=False, pil_resize=True))
             self.cfg["inverter"] = None
 
         if not dict_equal(cfg["inverter"], self.cfg.get("inverter", None)):

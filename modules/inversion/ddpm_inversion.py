@@ -151,8 +151,13 @@ class DDPMInversion(DiffusionInversion):
 
         latent = self.controller.begin_step(latent=latent)
 
-        guidance_scale = torch.tensor([self.guidance_scale_fwd, self.guidance_scale_bwd], 
-                                      device=self.model.device)[:, None, None, None]
+        if latent.shape[0] == 2:
+            guidance_scale = torch.tensor([self.guidance_scale_fwd, self.guidance_scale_bwd], 
+                                        device=self.model.device, dtype=latent.dtype)[:, None, None, None]
+        else:
+            assert latent.shape[0] == 1
+            guidance_scale = self.guidance_scale_bwd
+
         noise_pred = self.predict_noise(latent, t, context, guidance_scale)
         latent = self.step_backward(noise_pred, t, latent, eta=eta, variance_noise=variance_noise).prev_sample
 

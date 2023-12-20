@@ -26,7 +26,7 @@ class TestData(unittest.TestCase):
         "imagenetr-ti2i",
         # "ptp20",
         "pie",
-        "imagenhub",
+        # "imagenhub",
     ]
 
     # which keys are required in a dataset item

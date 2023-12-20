@@ -102,7 +102,7 @@ class StablePostProc:
 
 
 def load_diffusion_model(model: str="CompVis/stable-diffusion-v1-4", device: str="cuda", 
-                         preproc_args: Optional[Dict[str, Any]]=None,
+                         preproc_args: Optional[Dict[str, Any]]=None, variant=None, **kwargs,
                          ) -> Tuple[StableDiffusionPipeline, StablePreprocess, StablePostProc]:
     """Loads a diffusion model from HuggingFace with respective preprocessing and postprocessing function.
 
@@ -115,11 +115,24 @@ def load_diffusion_model(model: str="CompVis/stable-diffusion-v1-4", device: str
         Tuple[StableDiffusionPipeline, StablePreprocess, StablePostProc]: Model pipeline, preprocessing function, postprocessing function
     """
     
-    print(f"Loading model {model} ...")
+    variant = variant or "fp32"
+
+    print(f"Loading model {model} ({variant}) ...")
+
+    diffusers_kwargs = {}
+
+    if variant == "fp16":
+        diffusers_kwargs = dict(
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+            variant="fp16"
+        )
+    elif variant == "fp32":
+        pass
 
     if model in ("CompVis/stable-diffusion-v1-4",):
         scheduler = DDIMScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", clip_sample=False, set_alpha_to_one=False)
-        model = StableDiffusionPipeline.from_pretrained(model, scheduler=scheduler).to(device)
+        model = StableDiffusionPipeline.from_pretrained(model, scheduler=scheduler, **diffusers_kwargs).to(device)
         return model, (StablePreprocess(device, size=512, **(preproc_args if preproc_args is not None else {})), StablePostProc())
     else:
         raise Exception(model)

@@ -36,16 +36,20 @@ class TestInv(unittest.TestCase):
         dict(type="proxnpi", scheduler="ddim", num_inference_steps=50),
         dict(type="edict", scheduler="ddim", num_inference_steps=50),
         dict(type="ddpminv", scheduler="ddpm", num_inference_steps=50),
+        dict(type="dirinv", scheduler="ddim", num_inference_steps=50),
+        dict(type="etainv", scheduler="ddim", num_inference_steps=50),
     ]
 
     # target means
     test_data = {
-        "diffinv_ddim_50": -0.0033935923129320145,
+        "diffinv_ddim_50": -0.003393499180674553,
         "nti_ddim_50": -0.005135257262736559,
-        "npi_ddim_50": -0.008206205442547798,
-        "proxnpi_ddim_50": -0.008206205442547798,
-        "edict_ddim_50": -0.007414201274514198,
-        "ddpminv_ddpm_50": -0.011976688168942928
+        "npi_ddim_50": -0.008206297643482685,
+        "proxnpi_ddim_50": -0.008206297643482685,
+        "edict_ddim_50": -0.007414111401885748,
+        "ddpminv_ddpm_50": 0.002014702884480357,
+        "dirinv_ddim_50": -0.0074142711237072945,
+        "etainv_ddim_50":  -0.0074142711237072945,
     }
 
     @classmethod

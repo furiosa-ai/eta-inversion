@@ -202,6 +202,7 @@ class DiffusionInversion:
         Returns:
             torch.Tensor: latent z0 (input for forward diffusion process)
         """
+        image = image.to(self.model.vae.dtype)
         latent = self.model.vae.encode(image)['latent_dist'].mean
         latent = latent * 0.18215
         return latent

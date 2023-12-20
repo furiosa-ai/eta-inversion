@@ -148,6 +148,11 @@ class Demo:
                 label="Model", 
                 choices=self.get_model_choices(), 
                 value=self.default_values["model"])
+            
+            self.inputs["model.variant"] = gr.Dropdown(
+                label="Precision", 
+                choices=(("FP32", "fp32"), ("FP16", "fp16"),), 
+                value="fp32")
 
     def build_invert(self) -> None:
         """Builds gradio components for inverter select and inverter configuration.

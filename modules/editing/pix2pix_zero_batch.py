@@ -1,11 +1,9 @@
 
 import contextlib
-
-from modules.inversion.direct_inversion import DirectInversion
-from modules.inversion.eta_inversion import EtaInversion
 from .editor import Editor
 from .injector import Injector
 from ..inversion.edict_inversion import EdictInversion
+from ..inversion.eta_inversion import EtaInversion
 import torch
 import numpy as np
 from typing import Dict, Iterator, List, Optional, Any, Tuple, Union
@@ -113,22 +111,7 @@ class Pix2PixZeroAttnProcessor:
         return hidden_states
 
 
-class Pix2PixZeroSourceInjector(Injector):
-    """Injector for source latent diffusion backward.
-    """
-
-    def __init__(self, inverter: DiffusionInversion) -> None:
-        super().__init__(inverter)
-
-    def predict_noise(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale: Optional[Union[float, int]], 
-                      is_fwd: bool=False, **kwargs) -> torch.Tensor:
-        # pass required cross attention kwargs for pix2pix zero. Edict additionally needs latent_idx.
-        cross_attention_kwargs = {"latent_idx": kwargs.get("latent_idx", None), "timestep": t}
-
-        return self.inverter.predict_noise(latent, t, context, guidance_scale, is_fwd, cross_attention_kwargs=cross_attention_kwargs, **kwargs)
-
-
-class Pix2PixZeroTargetInjector(Injector):
+class Pix2PixZeroSourceTargetInjector(Injector):
     """Injector for target latent diffusion backward.
     """
 
@@ -146,48 +129,63 @@ class Pix2PixZeroTargetInjector(Injector):
         self.cross_attention_guidance_amount = cross_attention_guidance_amount
 
     def predict_noise(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale: Optional[Union[float, int]], 
-                      is_fwd: bool=False, **kwargs) -> torch.Tensor:
-        assert latent.shape[0] == 1 and not is_fwd, "Provide only one prompt."
+                    is_fwd: bool=False, **kwargs) -> torch.Tensor:
+        noise_preds = [self._predict_noise(l, t, c, guidance_scale, is_source, is_fwd, **kwargs) 
+                       for l, c, is_source in zip(latent.chunk(2), context.chunk(2), [True, False])]
+        
+        noise_pred = torch.cat(noise_preds)
 
-        # Prepare for cfg and grad computation
-        latent = latent.detach().clone()
-        latent = torch.cat([latent] * 2)
-        latent.requires_grad = True
+        return noise_pred
+
+    def _predict_noise(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale: Optional[Union[float, int]], 
+                       is_source, is_fwd: bool=False, **kwargs) -> torch.Tensor:
+        assert latent.shape[0] == 1 and not is_fwd, "Provide only one prompt."
         latent_idx = kwargs.pop("latent_idx", None)  # for edict
 
-        # latent optimizer for grad guidance
-        opt = torch.optim.SGD([latent], lr=self.cross_attention_guidance_amount)
+        if not is_source:
+            # Prepare for cfg and grad computation
+            latent = latent.detach().clone()
+            latent = torch.cat([latent] * 2)
+            latent.requires_grad = True
 
-        with torch.enable_grad():
-            # initialize loss
-            loss = Pix2PixZeroL2Loss()
+            # latent optimizer for grad guidance
+            opt = torch.optim.SGD([latent], lr=self.cross_attention_guidance_amount)
 
-            # predict the noise residual
-            noise_pred = self.inverter.unet(
-                latent,
-                t,
-                encoder_hidden_states=context,
-                cross_attention_kwargs={"timestep": t, "loss": loss, "latent_idx": latent_idx},
-                **kwargs
-            ).sample
+            with torch.enable_grad():
+                # initialize loss
+                loss = Pix2PixZeroL2Loss()
 
-            # update latent using gradient
-            loss.loss.backward(retain_graph=False)
-            opt.step()
+                # predict the noise residual
+                noise_pred = self.inverter.unet(
+                    latent,
+                    t,
+                    encoder_hidden_states=context,
+                    cross_attention_kwargs={"timestep": t, "loss": loss, "latent_idx": latent_idx},
+                    **kwargs
+                ).sample
+
+                # update latent using gradient
+                loss.loss.backward(retain_graph=False)
+                opt.step()
+
+            # cache the updated latent for step_backward()
+            self.latent = latent
 
         # call original method and use the updated latent to make a new noise prediction
         noise_pred = self.inverter.predict_noise(latent.detach(), t, context, guidance_scale, is_fwd, 
                                                  cross_attention_kwargs={"timestep": t, "latent_idx": latent_idx}, **kwargs)
 
-        # cache the updated latent for step_backward()
-        self.latent = latent
-
         return noise_pred
     
+    # def step_backward(self, noise_pred: torch.Tensor, t: torch.Tensor, latent: torch.Tensor, *args, **kwargs) -> Any:
+    #     return 
+
     def step_backward(self, noise_pred: torch.Tensor, t: torch.Tensor, latent: torch.Tensor, *args, **kwargs) -> Any:
          # load cached latent (only unconditional part)
-        latent = self.latent.detach().chunk(2)[0]
-        self.latent = None
+        # if not is_source:
+        if latent.shape[0] == 2:
+            latent[:1] = self.latent.detach().chunk(2)[0]
+            self.latent = None
 
         # call original method 
         return self.inverter.step_backward(noise_pred, t, latent, *args, **kwargs)
@@ -201,36 +199,32 @@ def set_attn_processors(unet: UNet2DConditionModel, **kwargs) -> None:
         unet (UNet2DConditionModel): UNet model
     """
 
-    try:
-        pix2pix_zero_attn_procs = {}
-        for name in unet.attn_processors.keys():
-            if "attn2" in name:
-                # apply pix2pix zero
-                attn_proc = Pix2PixZeroAttnProcessor(is_pix2pix_zero=True, **kwargs)
-            else:
-                attn_proc = Pix2PixZeroAttnProcessor(is_pix2pix_zero=False, **kwargs)
-            pix2pix_zero_attn_procs[name] = attn_proc
+    pix2pix_zero_attn_procs = {}
+    for name in unet.attn_processors.keys():
+        if "attn2" in name:
+            # apply pix2pix zero
+            attn_proc = Pix2PixZeroAttnProcessor(is_pix2pix_zero=True, **kwargs)
+        else:
+            attn_proc = Pix2PixZeroAttnProcessor(is_pix2pix_zero=False, **kwargs)
+        pix2pix_zero_attn_procs[name] = attn_proc
 
-        # store old processors to revert after pix2pix zero
-        attn_procs_old = {**unet.attn_processors}
-        unet.set_attn_processor(pix2pix_zero_attn_procs)
-
-        yield
-    finally:
-        unet.set_attn_processor(attn_procs_old)
+    # store old processors to revert after pix2pix zero
+    attn_procs_old = {**unet.attn_processors}
+    unet.set_attn_processor(pix2pix_zero_attn_procs)
+    yield
+    unet.set_attn_processor(attn_procs_old)
 
 
 class Pix2PixZeroEditor(Editor):
     """MasaControl editor
     """
 
-    def __init__(self, inverter: DiffusionInversion, cross_attention_guidance_amount: float=0.1, gen_caption: bool=True) -> None:
+    def __init__(self, inverter: DiffusionInversion, cross_attention_guidance_amount: float=0.1, gen_caption=True) -> None:
         """Initiates a new editor object.
 
         Args:
             inverter (DiffusionInversion): _description_
             cross_attention_guidance_amount (float, optional): Cross attention guidance amount for pix2pix zero. Defaults to 0.1.
-            gen_caption (bool, optional): If True, caption for inversion will be generated using BLIP. Otherwise a null prompt is used. Defaults to True.
         """
 
         super().__init__()
@@ -297,9 +291,6 @@ class Pix2PixZeroEditor(Editor):
         return caption
 
     def edit(self, image: torch.Tensor, source_prompt: str, target_prompt: str, cfg: Optional[Dict[str, Any]]=None) -> Dict[str, Any]:
-        if isinstance(self.inverter, (DirectInversion, EtaInversion)):
-            return None
-
         assert cfg is None
 
         if self.gen_caption:
@@ -326,20 +317,22 @@ class Pix2PixZeroEditor(Editor):
         # use attention processors. pass if inverter is edict or not.
         with set_attn_processors(self.model.unet, is_edict=isinstance(self.inverter, EdictInversion)):
             # source backward first to store attention maps
-            with Pix2PixZeroSourceInjector(self.inverter):
-                _ = self.inverter.sample(inv_res, context=src_context)
+            # with Pix2PixZeroSourceInjector(self.inverter):
+            #     _ = self.inverter.sample(inv_res, context=src_context)
 
             # use stored attention maps to guide target backward
-            with Pix2PixZeroTargetInjector(self.inverter, cross_attention_guidance_amount=self.cross_attention_guidance_amount):
+            with Pix2PixZeroSourceTargetInjector(self.inverter, cross_attention_guidance_amount=self.cross_attention_guidance_amount):
                 edit_res = self.inverter.sample(
                     inv_res, 
-                    context=target_context)
+                    context=[src_context, target_context])
 
         # if editing failed (e.g., inverter and editor not compatible)
         if edit_res is None:
             return None
 
         return {
-            "image": edit_res["image"],   # Edited image
-            "latent": edit_res["latent"],  # z0 for edited image
+            "image_inv": edit_res["image"][0:1],  # Image from inversion
+            "image": edit_res["image"][1:2],   # Edited image
+            "latent_inv": edit_res["latent"][0:1],  # z0 for inverted image
+            "latent": edit_res["latent"][1:2],  # z0 for edited image
         }

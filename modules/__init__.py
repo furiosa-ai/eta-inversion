@@ -49,6 +49,7 @@ _editors = {
     "masactrl": MasactrlEditor,
     "pnp": PlugAndPlayEditor,
     "pix2pix_zero": Pix2PixZeroEditor,
+    # "pix2pix_zero_split": Pix2PixZeroEditor,
     "invedit": InversionEditor,
 }
 
