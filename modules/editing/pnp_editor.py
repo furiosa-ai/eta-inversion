@@ -30,45 +30,39 @@ class PlugAndPlayEditor(Editor):
         self.no_null_source_prompt = no_null_source_prompt
 
     @contextlib.contextmanager
-    def register_editor(self, fwd_latents: List[Tensor]) -> Iterator[None]:
+    def register_editor(self) -> Iterator[None]:
         """Applies PnP hooks and then removes them again.
-
-        Args:
-            fwd_latents (List[Tensor]): Latents from inversion. 
-            PnP uses latents from inversion instead of denoising with the source prompt again.
 
         Yields:
             Iterator[None]: context
         """
-        register_pnp(self.model, fwd_latents)
+
+        register_pnp(self.model, None)
         yield
         unregister_pnp(self.model)
 
     def edit(self, image: Tensor, source_prompt: str, target_prompt: str, cfg: Optional[Dict[str, Any]]=None) -> Dict[str, Any]:
         assert cfg is None
 
-        if isinstance(self.inverter, EdictInversion):
-            # no edict support
-            print("This pnp implementation does not work with edict")
-            return None
-
         # create context from prompts
         src_context = self.inverter.create_context("" if not self.no_null_source_prompt else source_prompt)
         target_context = self.inverter.create_context(target_prompt)
 
         # diffusion inversion with the source prompt to obtain inverse latent zT and intermediate latents
-        inv_res = self.inverter.invert(image, context=src_context, guidance_scale_fwd=1)
+        inv_res = self.inverter.invert(image, context=src_context)
 
-        with self.register_editor(inv_res["latents"]):
+        with self.register_editor():
             if self.negative_prompt is not None and self.negative_prompt != "":
                 target_context = self.inverter.create_context(target_prompt, negative_prompt=self.negative_prompt)
 
-            edit_res = self.inverter.sample(inv_res, context=[target_context])
+            edit_res = self.inverter.sample(inv_res, context=[src_context, target_context])
         
         if edit_res is None:
             return None
 
         return {
-            "image": edit_res["image"][0:1],  # Edited image
-            "latent": edit_res["latent"][0:1],  # z0 for edited image
+            "image_inv": edit_res["image"][0:1],  # Image from inversion
+            "image": edit_res["image"][1:2],   # Edited image
+            "latent_inv": edit_res["latent"][0:1],  # z0 for inverted image
+            "latent": edit_res["latent"][1:2],  # z0 for edited image
         }

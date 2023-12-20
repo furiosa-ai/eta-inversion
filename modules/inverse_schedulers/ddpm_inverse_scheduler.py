@@ -14,13 +14,14 @@ class DDPMInverseScheduler(DiffusionInverseScheduler):
     # step output
     Output = namedtuple("DDPMInverseSchedulerOutput", ("prev_sample", "variance_noise"))
 
-    def __init__(self, scheduler: DDIMScheduler, inv_steps: str="sameshift", eta: int=1) -> None:
+    def __init__(self, scheduler: DDIMScheduler, inv_steps: str="sameshift", eta: int=1, markovian_forward=False) -> None:
         """Creates a new DDPM inverse scheduler
 
         Args:
             scheduler (DDIMScheduler):  DDIM scheduler to get config from
             inv_steps (str, optional): Only sameshift supported for now. Defaults to "sameshift".
             eta (int, optional): Unused for now. Defaults to 1.
+            markovian_forward (bool, optional): If True, x_t is sampled from x_t-1, otherwise x_t is sampled from x_0. Defaults to False.
         """
 
         super().__init__()
@@ -28,14 +29,16 @@ class DDPMInverseScheduler(DiffusionInverseScheduler):
         self.inv_steps = inv_steps
         self.etas = None
         self.t_to_idx = None
+        self.markovian_forward = markovian_forward
 
     @staticmethod
-    def from_scheduler(scheduler, inv_steps="sameshift", **kwargs) -> "DDPMInverseScheduler":
+    def from_scheduler(scheduler, inv_steps="sameshift", markovian_forward=False, **kwargs) -> "DDPMInverseScheduler":
         """Creates a new DDPM inverse scheduler
 
         Args:
             scheduler (DDIMScheduler):  DDIM scheduler to get config from
             inv_steps (str, optional): Only sameshift supported for now. Defaults to "sameshift".
+            markovian_forward (bool, optional): If True, x_t is sampled from x_t-1, otherwise x_t is sampled from x_0. Defaults to False.
 
         Returns:
             DDPMInverseScheduler: Inverse DDPM scheduler instance
@@ -44,6 +47,7 @@ class DDPMInverseScheduler(DiffusionInverseScheduler):
         return DDPMInverseScheduler(
             DDIMScheduler.from_config({**scheduler.config, **kwargs}),
             inv_steps=inv_steps,
+            markovian_forward=markovian_forward,
         )
 
     def set_timesteps(self, num_inference_steps):
@@ -95,7 +99,7 @@ class DDPMInverseScheduler(DiffusionInverseScheduler):
 
         alpha_bar = self.scheduler.alphas_cumprod
         sqrt_one_minus_alpha_bar = (1-alpha_bar) ** 0.5
-        alphas = self.scheduler.alphas
+        # alphas = self.scheduler.alphas
         variance_noise_shape = (num_inference_steps, *latent.shape[1:])
         
         timesteps = self.scheduler.timesteps.to(latent.device)
@@ -103,11 +107,23 @@ class DDPMInverseScheduler(DiffusionInverseScheduler):
         # allocate tensor for all intermediate results
         xts = torch.zeros(variance_noise_shape).to(latent.device)
 
+        cur_latent = latent
         for t in reversed(timesteps):
             # for every timestep, sample random gaussian noise and add it to the latent according to the noise schedule
             idx = self.t_to_idx[int(t)]
             r = torch.randn(latent.shape, device=latent.device, generator=generator)
-            xts[idx] = latent * (alpha_bar[t]**0.5) + r * sqrt_one_minus_alpha_bar[t]
+
+            if not self.markovian_forward:
+                # sample from x_0
+                xts[idx] = latent * (alpha_bar[t]**0.5) + r * sqrt_one_minus_alpha_bar[t]
+            else:
+                # sample from x_t-1
+                t_prev = t - self.scheduler.config.num_train_timesteps // self.scheduler.num_inference_steps
+                alpha_bar_t = alpha_bar[t]
+                alpha_bar_t_prev = alpha_bar[t_prev] if t_prev >= 0 else 1
+                cur_latent = cur_latent * ((alpha_bar_t / alpha_bar_t_prev)**0.5) + r * ((1 - (alpha_bar_t / alpha_bar_t_prev))**0.5)
+                xts[idx] = cur_latent
+
         xts = torch.cat([xts, latent],dim = 0)
 
         return xts

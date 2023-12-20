@@ -48,13 +48,13 @@ class ControllerBase:
         """
         return latent
     
-    def copy(self) -> "ControllerBase":
+    def copy(self, **kwargs) -> "ControllerBase":
         """Copies the controller to a new instance. Needed for e.g., Edit
 
         Returns:
             ControllerBase: New controller instance
         """
-        raise NotADirectoryError
+        raise NotImplementedError
 
 
 class ControllerEmpty(ControllerBase):
@@ -64,7 +64,7 @@ class ControllerEmpty(ControllerBase):
     def __init__(self) -> None:
         super().__init__()
 
-    def copy(self) -> "ControllerEmpty":
+    def copy(self, **kwargs) -> "ControllerEmpty":
         return self
 
 
@@ -77,7 +77,7 @@ class EdictController(ControllerBase):
         
         # one controller for each latent pair
         self.controllers = [
-            controller.copy() for _ in range(2)
+            controller.copy(latent_idx=i) for i in range(2)
         ]
 
         # current latent index (0 or 1)
@@ -91,16 +91,20 @@ class EdictController(ControllerBase):
         for controller in self.controllers:
             controller.end()
 
-    def begin_step(self, latent_idx: int) -> None:
+    def begin_step(self, latent_idx: int, latent_base: torch.Tensor, latent_model_input: torch.Tensor) -> None:
         """Called at the start of a diffusion step
 
         Args:
-            latent_idx (int): Index of current latent (0 or 1)
+            latent_idx (int): Index of current latent (0 or 1).
+            latent_base (torch.Tensor): Current EDICT base latent.
+            latent_model_input (torch.Tensor): Current EDICT model input.
         """
 
         # execute controller assigned to latent pair
         self.cur_latent_idx = latent_idx
-        self.controllers[self.cur_latent_idx].begin_step(None)
 
-    def end_step(self, latent: torch.Tensor) -> torch.Tensor:
-        return self.controllers[self.cur_latent_idx].end_step(latent=latent)
+        # try latent_base and latent_model_input
+        self.controllers[self.cur_latent_idx].begin_step(latent_base)
+
+    def end_step(self, latent: torch.Tensor, **kwargs) -> torch.Tensor:
+        return self.controllers[self.cur_latent_idx].end_step(latent=latent, **kwargs)

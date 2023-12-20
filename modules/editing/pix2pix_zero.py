@@ -218,12 +218,13 @@ class Pix2PixZeroEditor(Editor):
     """MasaControl editor
     """
 
-    def __init__(self, inverter: DiffusionInversion, cross_attention_guidance_amount: float=0.1) -> None:
+    def __init__(self, inverter: DiffusionInversion, cross_attention_guidance_amount: float=0.1, gen_caption: bool=True) -> None:
         """Initiates a new editor object.
 
         Args:
             inverter (DiffusionInversion): _description_
             cross_attention_guidance_amount (float, optional): Cross attention guidance amount for pix2pix zero. Defaults to 0.1.
+            gen_caption (bool, optional): If True, caption for inversion will be generated using BLIP. Otherwise a null prompt is used. Defaults to True.
         """
 
         super().__init__()
@@ -231,7 +232,7 @@ class Pix2PixZeroEditor(Editor):
         self.inverter = inverter
         self.model = self.inverter.model
         self.cross_attention_guidance_amount = cross_attention_guidance_amount
-        self.gen_caption = True
+        self.gen_caption = gen_caption
 
         if self.gen_caption:
             # generates caption for inversion and source backward using blip
@@ -297,7 +298,8 @@ class Pix2PixZeroEditor(Editor):
             caption = self.generate_caption(image)
         else:
             # use provided source prompt as image caption
-            caption = source_prompt
+            caption = ""
+            # caption = source_prompt
 
         # create source context from caption
         src_context = self.inverter.create_context(caption, negative_prompt=caption)
@@ -320,7 +322,13 @@ class Pix2PixZeroEditor(Editor):
 
             # use stored attention maps to guide target backward
             with Pix2PixZeroTargetInjector(self.inverter, cross_attention_guidance_amount=self.cross_attention_guidance_amount):
-                edit_res = self.inverter.sample(inv_res, context=target_context)
+                edit_res = self.inverter.sample(
+                    inv_res, 
+                    context=target_context)
+
+        # if editing failed (e.g., inverter and editor not compatible)
+        if edit_res is None:
+            return None
 
         return {
             "image": edit_res["image"],   # Edited image

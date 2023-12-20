@@ -165,6 +165,7 @@ class EditorManager:
             self.editor = load_editor(inverter=self.inverter, **cfg["editor"])
 
         # editing
+        enable_deterministic()
         image = self.preproc(source_image)
         edit_res = self.editor.edit(image, source_prompt, target_prompt)
         img_edit = self.postproc(edit_res["image"])

@@ -4,37 +4,37 @@ from .base import SimpleMetric
 from typing import Optional, Tuple
 
 
-# class MSEMetric(SimpleMetric):
-#     def __init__(self, input_range=(-1, 1)) -> None:
-#         super().__init__(input_range)
+class MSEMetric(SimpleMetric):
+    def __init__(self, input_range=(-1, 1), device: Optional[str]=None) -> None:
+        super().__init__(input_range, device)
 
-#         self.crit = torch.nn.MSELoss()
+        self.crit = torch.nn.MSELoss()
 
-#     def forward(self, pred, target):
-#         pred = self._normalize(pred)
-#         target = self._normalize(target)
+    def forward(self, pred, target):
+        pred = self._normalize(pred)
+        target = self._normalize(target)
 
-#         return self.crit(pred, target)
+        return self.crit(pred, target)
 
-#     def __repr__(self) -> str:
-#         return "mse"
+    def __repr__(self) -> str:
+        return "mse"
     
 
-# class PSNRMetric(SimpleMetric):
-#     def __init__(self, input_range=(-1, 1)) -> None:
-#         super().__init__(input_range)
+class PSNRMetric(SimpleMetric):
+    def __init__(self, input_range=(-1, 1), device: Optional[str]=None) -> None:
+        super().__init__(input_range, device)
 
-#         self.mse_crit = torch.nn.MSELoss()
+        self.mse_crit = torch.nn.MSELoss()
 
-#     def forward(self, pred, target):
-#         pred = self._normalize(pred)
-#         target = self._normalize(target)
+    def forward(self, pred, target):
+        pred = self._normalize(pred)
+        target = self._normalize(target)
 
-#         mse = self.mse_crit(pred, target)
-#         return 10 * torch.log10(1 / mse)
+        mse = self.mse_crit(pred, target)
+        return 10 * torch.log10(1 / mse)
 
-#     def __repr__(self) -> str:
-#         return "psnr"
+    def __repr__(self) -> str:
+        return "psnr"
 
 
 class LPIPSMetric(SimpleMetric):

@@ -217,6 +217,7 @@ class AttentionControlEdit(AttentionStore, abc.ABC):
                  self_replace_steps: Union[float, Tuple[float, float]],
                  local_blend: Optional[LocalBlend], attn_replace_thres: None=None) -> None:
         super(AttentionControlEdit, self).__init__()
+        self.prompts = prompts
         self.attn_replace_thres = attn_replace_thres or 32 ** 2
         self.batch_size = len(prompts)
         self.cross_replace_alpha = ptp_utils.get_time_words_attention_alpha(prompts, num_steps, cross_replace_steps, model.tokenizer).to(model.device)

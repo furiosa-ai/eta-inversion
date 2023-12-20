@@ -49,6 +49,8 @@ class TestEdit(unittest.TestCase):
         dict(type="proxnpi", scheduler="ddim", num_inference_steps=steps),
         dict(type="edict", scheduler="ddim", num_inference_steps=steps),
         dict(type="ddpminv", scheduler="ddpm", num_inference_steps=steps),
+
+        dict(type="diffinv_delta", scheduler="ddim", num_inference_steps=steps, delta_type="latent", mod_src=True),
     ]
 
     # edit methods to test
@@ -91,7 +93,11 @@ class TestEdit(unittest.TestCase):
         "ddpminv_ddpm_50__ptp": -0.03735125809907913,
         "ddpminv_ddpm_50__masactrl": -0.020472053438425064,
         "ddpminv_ddpm_50__pnp": -0.008612200617790222,
-        "ddpminv_ddpm_50__pix2pix_zero": -0.006461526267230511
+        "ddpminv_ddpm_50__pix2pix_zero": -0.006461526267230511,
+        
+        "diffinv_delta_ddim_50_latent_True__simple": -0.10673341155052185,
+        "diffinv_delta_ddim_50_latent_True__ptp": -0.06059194356203079,
+        "diffinv_delta_ddim_50_latent_True__masactrl": -0.05143100023269653,
     }
 
     # TestEdit.test_diffinv_ddim_50__pix2pix_zero_equal TestEdit.test_ddpminv_ddpm_50__pix2pix_zero_equal

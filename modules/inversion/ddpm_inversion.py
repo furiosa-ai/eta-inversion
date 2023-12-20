@@ -16,7 +16,8 @@ class DDPMInversion(DiffusionInversion):
 
     def __init__(self, model: StableDiffusionPipeline, scheduler: Optional[str]=None, num_inference_steps: Optional[int]=None, 
                  guidance_scale_bwd: Optional[float]=None, guidance_scale_fwd: Optional[float]=None,
-                 verbose: bool=False, forward_seed: Optional[int]=0, skip_steps: Optional[float]=None) -> None:
+                 verbose: bool=False, forward_seed: Optional[int]=0, skip_steps: Optional[float]=None,
+                 markovian_forward: bool=False) -> None:
         """Creates a new ddpm inversion instance.
 
         Args:
@@ -29,18 +30,20 @@ class DDPMInversion(DiffusionInversion):
             verbose (bool, optional): If True, print debug messages. Defaults to False.
             forward_seed (Optional[int], optional): Make forward process deterministic. Defaults to 0.
             skip_steps (Optional[float], optional): How many steps to skip in the reverse process. Defaults to None.
+            markovian_forward (bool, optional): If True, x_t is sampled from x_t-1, otherwise x_t is sampled from x_0. Defaults to False.
         """
 
         scheduler = scheduler or "ddpm"
         guidance_scale_fwd = guidance_scale_fwd or 3.5
-        guidance_scale_bwd = guidance_scale_bwd or 15
+        guidance_scale_bwd = guidance_scale_bwd or 9
         self.skip_steps = skip_steps or 0.36
         self.forward_seed = forward_seed if forward_seed >= 0 else None
+        self.markovian_forward = markovian_forward
         
         super().__init__(model, scheduler, num_inference_steps, guidance_scale_bwd, guidance_scale_fwd, verbose)
 
     def create_schedulers(self, model: StableDiffusionPipeline, scheduler: str, num_inference_steps: int) -> Tuple[DDIMScheduler, DDIMScheduler, DDPMInverseScheduler]:
-        return super().create_schedulers(model, "ddpm", num_inference_steps)
+        return super().create_schedulers(model, "ddpm", num_inference_steps, scheduler_inv_kwargs=dict(markovian_forward=self.markovian_forward))
 
     def predict_step_forward(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale_fwd: float, xts: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Perform one forward diffusion steps. Makes a noise prediction using SD's UNet first and then updates the latent using the noise scheduler.
@@ -148,10 +151,12 @@ class DDPMInversion(DiffusionInversion):
 
         latent = self.controller.begin_step(latent=latent)
 
-        noise_pred = self.predict_noise(latent, t, context, self.guidance_scale_bwd)
+        guidance_scale = torch.tensor([self.guidance_scale_fwd, self.guidance_scale_bwd], 
+                                      device=self.model.device)[:, None, None, None]
+        noise_pred = self.predict_noise(latent, t, context, guidance_scale)
         latent = self.step_backward(noise_pred, t, latent, eta=eta, variance_noise=variance_noise).prev_sample
 
-        latent = self.controller.end_step(latent=latent)
+        latent = self.controller.end_step(latent=latent, noise_pred=noise_pred, t=t)
 
         return latent, noise_pred
 

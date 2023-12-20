@@ -35,6 +35,26 @@ class EdictSchedulerBase:
 
         self.scheduler = scheduler
 
+    def _get_variance(self, timestep: int, prev_timestep: int):
+        """Gets variance from source to target timestep. Used if eta is greater than 0.
+
+        Args:
+            timestep (int): Source timestep.
+            prev_timestep (int): Target timestep.
+
+        Returns:
+            _type_: Variance
+        """
+
+        alpha_prod_t = self.get_alpha_and_beta(timestep)[0]
+        alpha_prod_t_prev = self.get_alpha_and_beta(prev_timestep)[0]
+        beta_prod_t = 1 - alpha_prod_t
+        beta_prod_t_prev = 1 - alpha_prod_t_prev
+
+        variance = (beta_prod_t_prev / beta_prod_t) * (1 - alpha_prod_t / alpha_prod_t_prev)
+
+        return variance
+
     def set_timesteps(self, num_inference_steps: int) -> None:
         """Set the number of inference steps
 
@@ -94,14 +114,18 @@ class EdictSchedulerBase:
         self,
         model_output: torch.Tensor,
         timestep: int,
-        sample: torch.Tensor
+        sample: torch.Tensor,
+        eta: float=0,
+        variance_noise: Optional[torch.Tensor]=None,
     ) -> DDIMSchedulerOutput:
         """Perform a scheduler step and update the current latent
 
         Args:
-            model_output (torch.Tensor):  Noise prediction from the diffusion model
-            timestep (int): Timestep
-            sample (torch.Tensor): Current latent
+            model_output (torch.Tensor):  Noise prediction from the diffusion model.
+            timestep (int): Timestep.
+            sample (torch.Tensor): Current latent.
+            eta (float): Eta > 0 will introduce random noise similar to DDIM
+            variance (Optional[torch.Tensor]. optional). Variance noise in case eta > 0. If not specified random noise is sampled. Defaults to None.
 
         Returns:
             DDIMSchedulerOutput: Updated latent result
@@ -121,7 +145,9 @@ class EdictScheduler(EdictSchedulerBase):
         self,
         model_output: torch.Tensor,
         timestep: int,
-        sample: torch.Tensor
+        sample: torch.Tensor,
+        eta: float=0,
+        variance_noise: Optional[torch.Tensor]=None,
     ) -> DDIMSchedulerOutput:
         if self.num_inference_steps is None:
             raise ValueError(
@@ -136,12 +162,21 @@ class EdictScheduler(EdictSchedulerBase):
         alpha_prod_t, beta_prod_t = self.get_alpha_and_beta(timestep)
         alpha_prod_t_prev, _ = self.get_alpha_and_beta(prev_timestep)
 
+        variance = self._get_variance(timestep, prev_timestep)
+        std_dev_t = eta * variance ** (0.5)
 
         alpha_quotient = ((alpha_prod_t / alpha_prod_t_prev)**0.5)
         first_term =  (1./alpha_quotient) * sample
         second_term = (1./alpha_quotient) * (beta_prod_t ** 0.5) * model_output
-        third_term = ((1 - alpha_prod_t_prev)**0.5) * model_output
-        return DDIMSchedulerOutput(first_term - second_term + third_term)
+        third_term = ((1 - alpha_prod_t_prev - std_dev_t**2)**0.5) * model_output
+
+        prev_sample = first_term - second_term + third_term
+
+        if eta > 0:
+            variance = std_dev_t * variance_noise
+            prev_sample = prev_sample + variance
+
+        return DDIMSchedulerOutput(prev_sample)
 
 
 class EdictSchedulerInverse(EdictSchedulerBase):
@@ -160,7 +195,9 @@ class EdictSchedulerInverse(EdictSchedulerBase):
         self,
         model_output: torch.Tensor,
         timestep: int,
-        sample: torch.Tensor
+        sample: torch.Tensor,
+        eta: float=0,
+        variance_noise: Optional[torch.Tensor]=None,
     ) -> DDIMSchedulerOutput:
         if self.num_inference_steps is None:
             raise ValueError(
@@ -192,7 +229,7 @@ class EdictInversion(DiffusionInversion):
 
     def __init__(self, model: StableDiffusionPipeline, scheduler: Optional[str]=None, num_inference_steps: Optional[int]=None, 
                  guidance_scale_bwd: Optional[float]=None, guidance_scale_fwd: Optional[float]=None,
-                 verbose: bool=False, mix_weight: float=0.93, leapfrog_steps: bool=True, init_image_strength: float=0.8) -> None:
+                 verbose: bool=False, mix_weight: float=0.93, leapfrog_steps: bool=True, init_image_strength: float=1.0, prec=torch.float32) -> None:
         """Creates a new edict inversion instance
 
         Args:
@@ -208,6 +245,8 @@ class EdictInversion(DiffusionInversion):
             init_image_strength (float, optional): How many steps to skip at the end of inversion and the start of denoising. Defaults to 0.8.
         """
         
+
+
         guidance_scale_fwd = guidance_scale_fwd or 3.0
         guidance_scale_bwd = guidance_scale_bwd or 3.0
 
@@ -217,6 +256,10 @@ class EdictInversion(DiffusionInversion):
         self.leapfrog_steps = leapfrog_steps
         self.init_image_strength = init_image_strength
         self.t_limit = self.num_inference_steps - int(self.num_inference_steps * init_image_strength)
+
+        # timestep to step index map
+        self.bwd_t_to_i = {t.item(): i for i, t in enumerate(self.get_timesteps_backward())}
+        self.fwd_t_to_i = {t.item(): i for i, t in enumerate(self.get_timesteps_forward())}
 
         with self.use_controller(None):
             pass
@@ -337,18 +380,19 @@ class EdictInversion(DiffusionInversion):
         """
 
         # controller callback
-        self.controller.begin_step(latent_idx)
+        self.controller.begin_step(latent_idx, latent_base, latent_model_input)
 
         noise_pred = self.predict_noise(latent_model_input, t, context, guidance_scale, is_fwd=False, latent_idx=latent_idx)
         new_latent = self.step_backward(noise_pred, t, latent_base).prev_sample
         new_latent = new_latent.to(latent_base.dtype)
         
         # controller callback
-        new_latent = self.controller.end_step(latent=new_latent)
+        new_latent = self.controller.end_step(latent=new_latent, noise_pred=noise_pred, t=t)
         return new_latent
 
     def predict_step_forward(self, latent: List[torch.Tensor], t: torch.Tensor, context: torch.Tensor, guidance_scale_fwd: Optional[int]=None) -> Tuple[List[torch.Tensor], None]:
         latent_pair = latent
+
         guidance_scale_fwd = guidance_scale_fwd or self.guidance_scale_fwd
         i = self.fwd_t_to_i[t.item()]
 
@@ -358,8 +402,6 @@ class EdictInversion(DiffusionInversion):
         for latent_idx, (latent_base, latent_model_input) in self.iter_latent_pair(i, latent_pair, is_fwd=True):
             # iterate over both latents in the pair. order is defined by edict.
             latent_pair[latent_idx] = self.predict_step_forward_single(latent_idx, latent_base, latent_model_input, t, context, guidance_scale_fwd)
-
-        # print(latent_pair[0].mean().item(), latent_pair[1].mean().item())
 
         return latent_pair, None
 
@@ -374,18 +416,16 @@ class EdictInversion(DiffusionInversion):
 
         # synchronize latent pair to avoid divergance of latent pair
         latent_pair = self.sync_latent_pair(latent_pair, is_fwd=False)
-
-        # print(latent_pair[0].mean().item(), latent_pair[1].mean().item())
-
+        
         return latent_pair, None
 
     def get_timesteps_forward(self) -> torch.Tensor:
         # cut off steps
-        return super().get_timesteps_forward()[:-self.t_limit]
+        return super().get_timesteps_forward()[:-self.t_limit] if self.t_limit != 0 else super().get_timesteps_forward()
 
     def get_timesteps_backward(self) -> torch.Tensor:
         # start later
-        return super().get_timesteps_backward()[self.t_limit:]
+        return super().get_timesteps_backward()[self.t_limit:] if self.t_limit != 0 else super().get_timesteps_backward()
 
     def encode(self, image: torch.Tensor) -> List[torch.Tensor]:
         latent = super().encode(image)

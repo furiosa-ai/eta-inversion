@@ -49,7 +49,7 @@ class MasactrlEditor(Editor):
         target_context = self.inverter.create_context(target_prompt)
 
         # diffusion inversion with the source prompt to obtain inverse latent zT
-        inv_res = self.inverter.invert(image, context=src_context, guidance_scale_fwd=1)
+        inv_res = self.inverter.invert(image, context=src_context)
 
         # apply masactrl hooks
         with self.register_editor():

@@ -85,6 +85,7 @@ def run_compute_metric(metric: EditMetric, eval_dir: Path, path: str, data: str,
                     edit_word=edit_word,
                     mask=sample.get("mask", None))
             except Exception as e:
+                loss = float("nan")
                 print(f"Skipping {image_file} because of {e}")
 
             # record loss for each example

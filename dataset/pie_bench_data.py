@@ -6,9 +6,24 @@ from PIL import Image
 import torch
 from typing import Dict, List, Any
 
-from .base import DatasetBase
+from dataset.base import DatasetBase
+
 
 class PieBenchData(DatasetBase):
+    # PIE category names and image indices
+    categories = {
+        '0_random': range(0, 140),
+        '1_change_object': range(140, 220),
+        '2_add_object': range(220, 300),
+        '3_delete_object': range(300, 380),
+        '4_change_attribute_content': range(380, 420),
+        '5_change_attribute_pose': range(420, 460),
+        '6_change_attribute_color': range(460, 500),
+        '7_change_attribute_material': range(500, 540),
+        '8_change_background': range(540, 620),
+        '9_change_style': range(620, 700)
+    }
+
     """Class for PIE (DirectInversion) dataset. Refer to https://github.com/cure-lab/DirectInversion
     """
 

@@ -5,8 +5,6 @@ import yaml
 import pickle
 
 from .base import DatasetBase
-from modules.utils.ptp import make_controller
-from diffusers import DDIMScheduler, StableDiffusionPipeline
 from typing import Any, Dict, Union
 
 
@@ -75,9 +73,9 @@ class EditingDataset(DatasetBase):
                 # default config for replacing in ptp (from official ptp repo)
                 return dict(
                     prompts = [source_prompt, target_prompt],
-                    is_replace_controller = True,
-                    cross_replace_steps = {'default_': .8,},
-                    self_replace_steps = .4,
+                    is_replace_controller = False,
+                    cross_replace_steps = {'default_': .4,},
+                    self_replace_steps = .6,
                     blend_words = (((source_word,), (target_word,))), # for local edit. If it is not local yet - use only the source object: blend_word = ((('cat',), ("cat",))).
                     equilizer_params = {"words": (target_word,), "values": (2,)}, # amplify attention to the word "tiger" by *2 
                 )
@@ -92,8 +90,8 @@ class EditingDataset(DatasetBase):
                 out = dict(
                     prompts = [source_prompt, target_prompt],
                     is_replace_controller = False,
-                    cross_replace_steps = {'default_': .8,},
-                    self_replace_steps = .4,
+                    cross_replace_steps = {'default_': .4,},
+                    self_replace_steps = .6,
                     # blend_words = (((source_word,), (target_word,))), # for local edit. If it is not local yet - use only the source object: blend_word = ((('cat',), ("cat",))).
                     # equilizer_params = {"words": (target_word,), "values": (2,)}, # amplify attention to the word "tiger" by *2 
                 )

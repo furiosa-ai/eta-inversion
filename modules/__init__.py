@@ -1,5 +1,7 @@
 
 
+from modules.editing.inv_editor import InversionEditor
+from modules.inversion.regularized_diffusion_inversion import RegularizedDiffusionInversion
 from .inversion.diffusion_inversion import DiffusionInversion
 from .inversion.null_text_inversion import NullTextInversion
 from .inversion.negative_prompt_inversion import NegativePromptInversion
@@ -7,6 +9,7 @@ from .inversion.proximal_negative_prompt_inversion import ProximalNegativePrompt
 from .inversion.edict_inversion import EdictInversion
 from .inversion.ddpm_inversion import DDPMInversion
 from .inversion.direct_inversion import DirectInversion
+from .inversion.eta_inversion import EtaInversion
 
 from .editing.simple_editor import SimpleEditor
 from .editing.ptp_editor import PromptToPromptEditor
@@ -22,6 +25,7 @@ from modules.editing.ptp_editor import PromptToPromptEditor
 from modules.editing.simple_editor import SimpleEditor
 from modules.inversion.diffusion_inversion import DiffusionInversion
 from typing import Union, List, Callable
+from functools import partial
 
 
 _inverters = {
@@ -31,7 +35,11 @@ _inverters = {
     "proxnpi": ProximalNegativePromptInversion,
     "edict": EdictInversion,
     "ddpminv": DDPMInversion,
+    "cyclediff": partial(DDPMInversion, markovian_forward=True),
     "dirinv": DirectInversion,
+    "etainv": EtaInversion,
+    "regdiffinv": RegularizedDiffusionInversion,
+    # "ddpminvcustom": EtaInversion
 }
 
 
@@ -41,6 +49,7 @@ _editors = {
     "masactrl": MasactrlEditor,
     "pnp": PlugAndPlayEditor,
     "pix2pix_zero": Pix2PixZeroEditor,
+    "invedit": InversionEditor,
 }
 
 

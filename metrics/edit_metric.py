@@ -4,7 +4,7 @@ from functools import partial
 from .clip_similarity import CLIPSimilarity
 from .clip_similarity import CLIPAccuracy
 from .dino_vit_structure import DinoVitStructure
-from .metrics import LPIPSMetric
+from .metrics import LPIPSMetric, MSEMetric, PSNRMetric
 from .nslpips import NSLPIPS
 from .bglpips import BGLPIPS
 from .ssim import SSIM
@@ -43,6 +43,8 @@ class EditMetric(SimpleMetric):
             "bglpips": BGLPIPS,
             "ssim": SSIM,
             "msssim": MSSSIM,
+            "mse": MSEMetric,
+            "psnr": PSNRMetric,
         }[self.metric_name](input_range=input_range, device=device, **kwargs)
 
     @staticmethod
@@ -62,10 +64,12 @@ class EditMetric(SimpleMetric):
             "dinovitstruct",
             "dinovitstruct_v2",
             "lpips",
-            "nslpips",
+            # "nslpips",
             "bglpips",
             "ssim",
             "msssim",
+            "mse",
+            "psnr",
         ]
 
     def update(self, source_image: torch.Tensor, edit_image: torch.Tensor, source_prompt: str, target_prompt: str, edit_word: str, mask: Optional[torch.Tensor]=None) -> float:
@@ -93,6 +97,8 @@ class EditMetric(SimpleMetric):
             "bglpips": (source_image, edit_image, source_prompt, mask),
             "ssim": (edit_image, source_image), 
             "msssim": (edit_image, source_image), 
+            "mse": (edit_image, source_image), 
+            "psnr": (edit_image, source_image), 
         }.get(self.metric_name, dict(
             source_image=source_image, target_image=edit_image, 
             source_prompt=source_prompt, target_prompt=target_prompt),

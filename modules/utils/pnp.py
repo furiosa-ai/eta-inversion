@@ -122,15 +122,28 @@ class PnPUnetForward:
     def __call__(self, sample: torch.Tensor, timestep: torch.Tensor, encoder_hidden_states: torch.Tensor) -> UNet2DConditionOutput:
         register_time(self.model, timestep.item())
 
-        # add source latents and null embeddings as first input to current sample for pnp
-        latent_model_input = torch.cat([self.source_latents[-(self.idx+1) if not self.use_time_as_idx else timestep.item()], sample])
-        encoder_hidden_states = torch.cat([self.pnp_guidance_embeds, encoder_hidden_states], dim=0)
+        if self.source_latents is not None:
+            # add source latents and null embeddings as first input to current sample for pnp
+            latent_model_input = torch.cat([self.source_latents[-(self.idx+1) if not self.use_time_as_idx else timestep.item()], sample])
+            encoder_hidden_states = torch.cat([self.pnp_guidance_embeds, encoder_hidden_states], dim=0)
+        else:
+            # use backward source latents instead of forward source latents
+            # cut out cond source latent
+            latent_model_input = sample[[0, 1, 3]]
+            encoder_hidden_states = encoder_hidden_states[[0, 1, 3]]
+
+        assert latent_model_input.shape[0] == 3
+        assert encoder_hidden_states.shape[0] == 3
 
         # apply the denoising network
         noise_pred = self.unet_forward(latent_model_input, timestep, encoder_hidden_states=encoder_hidden_states)['sample']
 
-        # discard unconditional output
-        noise_pred_uncond_cond = noise_pred[1:]
+        if self.source_latents is not None:
+            # discard unconditional output
+            noise_pred_uncond_cond = noise_pred[1:]
+        else:
+            # add cond source latent by duplicating uncond source latent
+            noise_pred_uncond_cond = noise_pred[[0, 1, 0, 2]]
 
         self.idx += 1
 

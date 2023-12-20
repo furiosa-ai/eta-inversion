@@ -33,14 +33,14 @@ class ControllerBasedEditor(Editor):
     """Base editor using a controller
     """
 
-    def __init__(self, inverter: DiffusionInversion, no_source_backward: bool=False, dft_cfg: Optional[Dict[Any, str]]=None) -> None:
+    def __init__(self, inverter: DiffusionInversion, no_source_backward: bool=False, dft_cfg: Optional[Dict[Any, str]]=None, fake_edit: bool=False) -> None:
         """Initiates a new editor object
 
         Args:
-            inverter (DiffusionInversion): Inverter to use for editing
+            inverter (DiffusionInversion): Inverter to use for editing.
             no_source_backward (bool, optional): If True, only target prompt is used for backward. Defaults to False.
-            dft_cfg (Optional[Dict[Any, str]], optional). Default config to use for editing. 
-            Used if no config is provided to edit(). Defaults to None.
+            dft_cfg (Optional[Dict[Any, str]], optional): Default config to use for editing. Used if no config is provided to edit(). Defaults to None.
+            fake_edit (bool, optional): If true editing will ignore input image and use the provided latent for editing. Defaults to False.
         """
 
         super().__init__()
@@ -48,14 +48,16 @@ class ControllerBasedEditor(Editor):
         self.inverter = inverter
         self.no_source_backward = no_source_backward
         self.dft_cfg = dft_cfg if dft_cfg is not None else {}
+        self.fake_edit = fake_edit
 
-    def make_controller(self, image: torch.Tensor, source_prompt: str, target_prompt: str, **kwargs) -> ControllerBase:
+    def make_controller(self, image: torch.Tensor, source_prompt: str, target_prompt: str, inv_res: Dict[str, Any], **kwargs) -> ControllerBase:
         """Creates a new controller for editing the current image
 
         Args:
-            image (torch.Tensor): Input image tensor
-            source_prompt (str): Source prompt
-            target_prompt (str): Target prompt
+            image (torch.Tensor): Input image tensor.
+            source_prompt (str): Source prompt.
+            target_prompt (str): Target prompt.
+            inv_res (Dict[str, Any]): Result from inversion.
 
         Returns:
             ControllerBase: New controller
@@ -64,17 +66,24 @@ class ControllerBasedEditor(Editor):
 
     def edit(self, image: torch.Tensor, source_prompt: str, target_prompt: str, cfg: Optional[Dict[str, Any]]=None, **kwargs) -> Dict[str, Any]:
         if cfg is None:
-            cfg = self.dft_cfg
+            cfg = {**self.dft_cfg}
 
         # create context from prompts
         src_context = self.inverter.create_context(source_prompt)
         target_context = self.inverter.create_context(target_prompt)
 
         # diffusion inversion with the source prompt to obtain inverse latent zT
-        inv_res = self.inverter.invert(image, context=src_context, guidance_scale_fwd=1)
+
+        zT_gt = cfg.pop("zT_gt", None)
+        if self.fake_edit:
+            image = None
+            # no inversion needed if fake editing
+            inv_res = {"latents": [zT_gt.to(self.inverter.model.device)]}
+        else:
+            inv_res = self.inverter.invert(image, context=src_context)  # , guidance_scale_fwd=1
 
         # prepare controller
-        controller = self.make_controller(image=image, source_prompt=source_prompt, target_prompt=target_prompt, **cfg, **kwargs)
+        controller = self.make_controller(image=image, source_prompt=source_prompt, target_prompt=target_prompt, inv_res=inv_res, **cfg, **kwargs)
 
         # sample a new image from the inverse latent zT
         # diffusion step is modified by the controller

@@ -1,4 +1,5 @@
 
+import time
 from utils.debug_utils import enable_deterministic
 enable_deterministic()
 
@@ -6,17 +7,15 @@ import torch
 from pathlib import Path
 import cv2
 import argparse
-from tqdm import trange
 
-from modules import get_edit_methods, get_inversion_methods, load_inverter, load_editor
+from modules import load_inverter, load_editor
 from modules.inversion.diffusion_inversion import DiffusionInversion
-# from modules.exceptions import DiffusionInversionException
-from utils.eval_utils import EditResultData
 from modules import StablePreprocess, StablePostProc
 from diffusers import StableDiffusionPipeline
 from typing import List, Tuple
 
 from utils.utils import add_argparse_arg
+
 
 
 def split_to_words(prompt: str) -> List[str]:
@@ -79,7 +78,7 @@ def main(input: str, src_prompt: str, target_prompt: str, output: str, inv_metho
 
     if edit_cfg is None:
         # Using a default config for prompt-to-prompt if no edit_cfg yaml is specified
-        if edit_method == "ptp":
+        if edit_method in ("ptp", "etaedit"):
             # Get blend word
             blended_word = get_edit_word(src_prompt, target_prompt)
 
@@ -109,12 +108,25 @@ def main(input: str, src_prompt: str, target_prompt: str, output: str, inv_metho
     editor = load_editor(inverter=inverter, type=edit_method)
 
     image = preproc(input)  # load and preprocess image
-    edit_res = editor.edit(image, src_prompt, target_prompt, cfg=edit_cfg)  # edit image
-    img_edit = postproc(edit_res["image"])  # postprocess output
 
+    t1 = time.time()
+    edit_res = editor.edit(image, src_prompt, target_prompt, cfg=edit_cfg)  # edit image
+    t2 = time.time()
+
+    img_edit = postproc(edit_res["image"])  # postprocess output
     # save result
     cv2.imwrite(output, cv2.cvtColor(img_edit, cv2.COLOR_RGB2BGR))
+
+    if "image_inv" in edit_res:
+        img_inv = postproc(edit_res["image_inv"])  # postprocess output
+        output_inv = Path(output)
+        output_inv = output_inv.parent / (output_inv.stem + "_inv" + output_inv.suffix)
+        # save result
+        cv2.imwrite(str(output_inv), cv2.cvtColor(img_inv, cv2.COLOR_RGB2BGR))
+
     print(f"Saved result to {output}")
+
+    print(f"Took {t2 - t1}s")
 
 
 def parse_args():

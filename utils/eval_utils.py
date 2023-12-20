@@ -2,7 +2,7 @@
 from pathlib import Path
 import cv2
 import yaml
-import uuid
+import numpy as np
 from itertools import product
 
 from dataset import load_dataset
@@ -62,7 +62,7 @@ def create_configs(cfg_all: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         cfg_all = yaml.safe_load(f)
 
     # keys for which to perform a carthesian product to create sub configs
-    keys_batch = ["data", "edit_cfg", "edit_method", "method"]
+    keys_batch = ["data", "edit_cfg", "method", "edit_method"]
 
     # product
     vals_batch = list(product(*[cfg_all.get(k, [None]) for k in keys_batch]))
@@ -130,11 +130,12 @@ class EditResultData:
         return EditResultData(**dic, **kwargs)
 
     @staticmethod
-    def from_metrics(eval_dir, **kwargs) -> "EditResultData":
+    def from_metrics(eval_dir: str, categories: Optional[Dict[str, List[int]]]=None, **kwargs) -> "EditResultData":
         """Create a result dataset and load metrics
 
         Args:
-            eval_dir (_type_): Path to evaluation directory.
+            eval_dir (str): Path to evaluation directory.
+            categories (Optional[Dict[str, List[int]]], optional): Divides images in categories and computes mean per category (e.g., for PIE categories). Defaults to None.
 
         Returns:
             EditResultData: Dataset with loaded metrics
@@ -159,9 +160,16 @@ class EditResultData:
         for metric_file in metric_files:
             with open(metric_file, "r") as f:
                 metric_data = yaml.safe_load(f)
-            
+
+            if categories is None:
+                metrics_total = {"mean": metric_data["mean"]}
+            else:
+                values = np.array([r["value"] for r in metric_data["results"]]).astype(float)
+                # recompute per category mean
+                metrics_total = {"mean": {name: np.mean(values[ind]) if len(values) > 0 else None for name, ind in categories.items()}}
+
             metrics[metric_data["name"]] = {
-                "mean": metric_data["mean"],
+                **metrics_total,
                 "results": metric_data["results"],
             }
 

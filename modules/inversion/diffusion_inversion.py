@@ -16,7 +16,7 @@ class DiffusionInversion:
     def __init__(self, model: StableDiffusionPipeline, scheduler: Optional[str]=None, num_inference_steps: Optional[int]=None, 
                  guidance_scale_bwd: Optional[float]=None, guidance_scale_fwd: Optional[float]=None,
                  verbose: bool=False) -> None:
-        """Creates a new diffusion inversion instance
+        """Creates a new diffusion inversion instance.
 
         Args:
             model (StableDiffusionPipeline): The diffusion model to invert. Must be Stable Diffusion for now.
@@ -31,8 +31,8 @@ class DiffusionInversion:
         # initialize with default parameters of ddim inversion if unset
         scheduler = scheduler or "ddim"
         self.num_inference_steps = num_inference_steps or 50
-        self.guidance_scale_bwd = guidance_scale_bwd or 7.5
-        self.guidance_scale_fwd = guidance_scale_fwd or 1
+        self.guidance_scale_bwd = guidance_scale_bwd if guidance_scale_bwd is not None else 7.5
+        self.guidance_scale_fwd = guidance_scale_fwd if guidance_scale_fwd is not None else 1
 
         self.model = model
         self.unet = model.unet
@@ -97,29 +97,31 @@ class DiffusionInversion:
     #     for k, v in old_cfg.items():
     #         setattr(self, k, v)
 
-    def create_schedulers(self, model: StableDiffusionPipeline, scheduler: Union[str, Dict[str, Any]], num_inference_steps: int
-                          ) -> Tuple[DiffusionInverseScheduler, DiffusionInverseScheduler, DiffusionInverseScheduler]:
+    def create_schedulers(self, model: StableDiffusionPipeline, scheduler: Union[str, Dict[str, Any]], num_inference_steps: int,
+                          scheduler_inv_kwargs: Optional[Dict[str, Any]]=None) -> Tuple[DiffusionInverseScheduler, DiffusionInverseScheduler, DiffusionInverseScheduler]:
         """Create model schedulers for model, backward process and forward process
 
         Args:
-            model (StableDiffusionPipeline): Diffusion model
-            scheduler (Union[str, Dict[str, Any]]): Scheduler name or configuration to create
-            num_inference_steps (int): Number of diffusion steps
+            model (StableDiffusionPipeline): Diffusion model.
+            scheduler (Union[str, Dict[str, Any]]): Scheduler name or configuration to create.
+            num_inference_steps (int): Number of diffusion steps.
+            scheduler_inv_kwargs (Optional[Dict[str, Any]], optional): Additional arguments for inverse scheduler. Defaults to None.
 
         Returns:
             Tuple[DiffusionInverseScheduler, DiffusionInverseScheduler, DiffusionInverseScheduler]: schedulers for model, backward process and forward process
         """
 
+        if scheduler_inv_kwargs is None:
+            scheduler_inv_kwargs = {}
+
         # grab scheduler arguments
         if isinstance(scheduler, str):
             scheduler_name = scheduler
             scheduler_kwargs = {}
-            scheduler_inv_kwargs = {}
         elif isinstance(scheduler, dict):
             scheduler_kwargs = {**scheduler}
             scheduler_name = scheduler_kwargs.pop("type")
 
-            scheduler_inv_kwargs = {} 
             if "inv_steps" in scheduler_kwargs:
                 scheduler_inv_kwargs["inv_steps"] = scheduler_kwargs.pop("inv_steps")
         else:

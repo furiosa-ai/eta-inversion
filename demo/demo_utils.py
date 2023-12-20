@@ -31,6 +31,8 @@ class Demo:
             ("proxnpi", "Proximal negative prompt inversion"),
             ("edict", "EDICT"),
             ("ddpminv", "DDPM inversion"),
+            ("dirinv", "Direct inversion"),
+            ("etainv", "Eta inversion"),
         ])
 
         self.editors = dict([
@@ -48,8 +50,8 @@ class Demo:
 
         self.default_values = {
             "model": "CompVis/stable-diffusion-v1-4",
-            "inverter": "diffinv",
-            "editor": "simple",
+            "inverter": "etainv",
+            "editor": "ptp",
         }
 
         self.editor_manager = EditorManager()
@@ -82,7 +84,7 @@ class Demo:
     
         if model in ("CompVis/stable-diffusion-v1-4", ):
             # only sd1.4 supported for now
-            out = ["diffinv", "nti", "npi", "proxnpi", "edict", "ddpminv"]
+            out = ["diffinv", "nti", "npi", "proxnpi", "edict", "ddpminv", "dirinv", "etainv"]
         else:
             out = []
 
@@ -134,7 +136,7 @@ class Demo:
         """
 
         with gr.Row():
-            self.inputs["editor.source_image"] = gr.Image(label="Input", value="test/data/gnochi_mirror_sq.png", width=512, height=512)
+            self.inputs["editor.source_image"] = gr.Image(label="Input", value="test/data/house.png", width=512, height=512)
             self.outputs["edit_image"] = gr.Image(label="Output", width=512, height=512)
 
     def build_model(self) -> None:
@@ -232,6 +234,24 @@ class Demo:
                             self.inputs[f"{k}.forward_seed"] = gr.Number(
                                 label="Seed", value=-1, precision=0, 
                                 info="Use -1 for random seed.")
+                            
+                        if inverter == "dirinv":
+                            pass
+
+                        if inverter == "etainv":
+                            self.inputs[f"{k}.eta_end"] = gr.Number(
+                                label="Eta t=T", value=0.4, step=0.1,)
+                            
+                            self.inputs[f"{k}.eta_start"] = gr.Number(
+                                label="Eta t=0", value=0.0, step=0.1,)
+                            
+                            self.inputs[f"{k}.noise_sample_count"] = gr.Number(
+                                label="Noise sample count", value=10, precision=0)
+                            
+                            self.inputs[f"{k}.seed"] = gr.Number(
+                                label="Seed", value=0, precision=0, 
+                                info="Use -1 for random seed.")
+
 
     def build_edit(self) -> None:
         """Builds gradio components for editor select and editor configuration.
@@ -245,8 +265,8 @@ class Demo:
             
             # source and target prompt are common for all editors
             with gr.Row():
-                self.inputs["editor.source_prompt"] = gr.Textbox(label="Source prompt", value="a cat sitting next to a mirror")
-                self.inputs["editor.target_prompt"] = gr.Textbox(label="Target prompt", value="a tiger sitting next to a mirror")
+                self.inputs["editor.source_prompt"] = gr.Textbox(label="Source prompt", value="a house in the woods")
+                self.inputs["editor.target_prompt"] = gr.Textbox(label="Target prompt", value="a monster in the woods")
 
             # build (hidden) menu for each editor
             for editor in self.editors:
@@ -262,29 +282,29 @@ class Demo:
                     if editor == "ptp":
                         with gr.Row():
                             self.inputs[f"{k}.dft_cfg.is_replace_controller"] = gr.Checkbox(
-                                label="Replace", value=True
+                                label="Replace", value=False
                             )
 
                             self.inputs[f"{k}.dft_cfg.cross_replace_steps"] = gr.Number(
-                                label="Cross replace steps", value=0.8, minimum=0, maximum=1, step=0.1,
+                                label="Cross replace steps", value=0.4, minimum=0, maximum=1, step=0.1,
                             )
 
                             self.inputs[f"{k}.dft_cfg.self_replace_steps"] = gr.Number(
-                                label="Self replace steps", value=0.5, minimum=0, maximum=1, step=0.1,
+                                label="Self replace steps", value=0.6, minimum=0, maximum=1, step=0.1,
                             )
 
                         with gr.Row():
                             self.inputs[f"{k}.dft_cfg.source_blend_word"] = gr.Textbox(
-                                label="Source blend word", value="cat",
+                                label="Source blend word", value="house",
                             )
 
                             self.inputs[f"{k}.dft_cfg.target_blend_word"] = gr.Textbox(
-                                label="Target blend word", value="tiger",
+                                label="Target blend word", value="monster",
                             )
 
                         with gr.Row():
                             self.inputs[f"{k}.dft_cfg.eq_params_words"] = gr.Textbox(
-                                label="Amplify word", value="tiger",
+                                label="Amplify word", value="monster",
                             )
 
                             self.inputs[f"{k}.dft_cfg.eq_params_values"] = gr.Number(

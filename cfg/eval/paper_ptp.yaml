@@ -1,0 +1,32 @@
+data:
+- pie
+# - pie_test3  # full pie dataset has 700 images -> do only 3 images for faster testing
+edit_method:
+- type: ptp
+# - type: masactrl
+#   no_null_source_prompt: True
+# - type: pnp2
+#   no_null_source_prompt: True
+method:
+- type: etainv
+  scheduler: ddim
+  eta: [0.0, 0.4]
+  noise_sample_count: 10
+- type: etainv
+  scheduler: ddim
+  eta: [0.0, 0.2]
+  noise_sample_count: 10000
+- type: diffinv
+  scheduler: ddim
+- type: dirinv
+  scheduler: ddim
+- type: nti
+  scheduler: ddim
+- type: npi
+  scheduler: ddim
+- type: edict
+  scheduler: ddim
+- type: proxnpi
+  scheduler: ddim
+- type: ddpminv
+  scheduler: ddim

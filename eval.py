@@ -16,7 +16,6 @@ from modules import load_inverter, load_editor
 # from modules.exceptions import DiffusionInversionException
 from utils.eval_utils import EditResultData, create_configs
 from modules import StablePreprocess, StablePostProc
-import time
 from diffusers import StableDiffusionPipeline
 from multiprocessing import Process
 from threading import Thread, Lock
@@ -71,7 +70,11 @@ def run_eval(path: str, data: str, method: Dict[str, Any], edit_method: Dict[str
         target_prompt = sample["edit"]["target_prompt"]
 
         # get editing config for the current example, if exists (necessary for ptp)
-        edit_cfg = sample["edit"].get(edit_method["type"], None)
+        edit_cfg = sample["edit"].get(edit_method["type"] if edit_method["type"] != "etaedit" else "ptp", None)
+
+        # uses for fake editing
+        if "zT_gt" in sample and isinstance(edit_cfg, dict):
+            edit_cfg["zT_gt"] = sample["zT_gt"]
 
         res = editor.edit(image, source_prompt, target_prompt, edit_cfg)
 
