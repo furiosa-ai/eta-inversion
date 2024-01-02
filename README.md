@@ -69,6 +69,7 @@ optional arguments:
                         Classifier free guidance scale to use for backward diffusion (denoising).
   --guidance_scale_fwd GUIDANCE_SCALE_FWD
                         Classifier free guidance scale to use for forward diffusion (inversion).
+  --prec {fp16,fp32}    Precision for diffusion.
 ```
 
 E.g., for plug-and-play editing using simple ddim inversion of `test/data/gnochi_mirror_sq.png` with prompt `"a cat->tiger sitting next to a mirror"`, run
