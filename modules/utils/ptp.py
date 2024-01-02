@@ -234,7 +234,7 @@ class AttentionReplace(AttentionControlEdit):
     def __init__(self, model: StableDiffusionPipeline, prompts: List[str], num_steps: int, cross_replace_steps: float, self_replace_steps: float,
                  local_blend: Optional[LocalBlend] = None, attn_replace_thres: None=None) -> None:
         super(AttentionReplace, self).__init__(model, prompts, num_steps, cross_replace_steps, self_replace_steps, local_blend, attn_replace_thres=attn_replace_thres)
-        self.mapper = seq_aligner.get_replacement_mapper(prompts, model.tokenizer).to(model.device)
+        self.mapper = seq_aligner.get_replacement_mapper(prompts, model.tokenizer).to(model.device).to(model.unet.dtype)
         
 
 class AttentionRefine(AttentionControlEdit):

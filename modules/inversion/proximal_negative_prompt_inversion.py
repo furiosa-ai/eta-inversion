@@ -99,7 +99,10 @@ class ProximalNegativePromptInversion(NegativePromptInversion):
             elif self.prox == 'l0':
                 score_delta = noise_prediction_text - noise_pred_uncond
                 if self.quantile > 0:
-                    threshold = score_delta.abs().quantile(self.quantile)
+                    if score_delta.dtype == torch.float16:
+                        threshold = score_delta.abs().float().quantile(self.quantile)
+                    else:
+                        threshold = score_delta.abs().quantile(self.quantile)
                 else:
                     threshold = -self.quantile  # if quantile is negative, use it as a fixed threshold
                 score_delta -= score_delta.clamp(-threshold, threshold)
