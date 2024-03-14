@@ -14,7 +14,7 @@ class Editor:
         """
         pass
 
-    def edit(self, image: torch.Tensor, source_prompt: str, target_prompt: str, cfg: Optional[Dict[str, Any]]=None) -> Dict[str, Any]:
+    def edit(self, image: torch.Tensor, source_prompt: str, target_prompt: str, cfg: Optional[Dict[str, Any]]=None, **kwargs) -> Dict[str, Any]:
         """Edit the image
 
         Args:
@@ -64,11 +64,20 @@ class ControllerBasedEditor(Editor):
         """
         raise NotImplementedError
 
-    def edit(self, image: torch.Tensor, source_prompt: str, target_prompt: str, cfg: Optional[Dict[str, Any]]=None, **kwargs) -> Dict[str, Any]:
+    def edit(self, image: torch.Tensor, source_prompt: str, target_prompt: str, cfg: Optional[Dict[str, Any]]=None, inv_cfg=None, **kwargs) -> Dict[str, Any]:
         if cfg is None:
             cfg = {**self.dft_cfg}
 
-        # create context from prompts
+        if inv_cfg is None:
+            inv_cfg = {}
+
+        # self.inverter.guidance_scale_fwd = 2.0
+        # self.inverter.guidance_scale_bwd = 7.5
+
+        # # create context from prompts
+        # src_context = self.inverter.create_context(source_prompt, negative_prompt=target_prompt)
+        # target_context = self.inverter.create_context(target_prompt, negative_prompt=source_prompt)
+        
         src_context = self.inverter.create_context(source_prompt)
         target_context = self.inverter.create_context(target_prompt)
 
@@ -80,7 +89,7 @@ class ControllerBasedEditor(Editor):
             # no inversion needed if fake editing
             inv_res = {"latents": [zT_gt.to(self.inverter.model.device)]}
         else:
-            inv_res = self.inverter.invert(image, context=src_context)  # , guidance_scale_fwd=1
+            inv_res = self.inverter.invert(image, prompt=source_prompt, context=src_context, inv_cfg=inv_cfg)  # , guidance_scale_fwd=1
 
         # prepare controller
         controller = self.make_controller(image=image, source_prompt=source_prompt, target_prompt=target_prompt, inv_res=inv_res, **cfg, **kwargs)
@@ -91,6 +100,9 @@ class ControllerBasedEditor(Editor):
             if not self.no_source_backward:
                 edit_res = self.inverter.sample(inv_res, context=[src_context, target_context])
                 
+                if edit_res is None:
+                    return None
+
                 return {
                     "image_inv": edit_res["image"][0:1], 
                     "image": edit_res["image"][1:2], 

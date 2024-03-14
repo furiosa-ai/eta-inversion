@@ -271,11 +271,17 @@ class DiffusionInversion:
             else:
                 assert latent.shape[0] == context.shape[0]
 
-            noise_pred = self.unet(latent, t, encoder_hidden_states=context, **kwargs)["sample"]
+            n_promps = latent.shape[0]//2
+            if isinstance(guidance_scale, (int, float)) and guidance_scale == 0:
+                noise_pred = self.unet(latent[:n_promps], t, encoder_hidden_states=context[:n_promps], **kwargs)["sample"]
+            elif isinstance(guidance_scale, (int, float)) and guidance_scale == 1:
+                noise_pred = self.unet(latent[n_promps:], t, encoder_hidden_states=context[n_promps:], **kwargs)["sample"]
+            else:
+                noise_pred = self.unet(latent, t, encoder_hidden_states=context, **kwargs)["sample"]
 
-            # cfg
-            noise_pred_uncond, noise_prediction_text = noise_pred.chunk(2)
-            noise_pred = noise_pred_uncond + guidance_scale * (noise_prediction_text - noise_pred_uncond)
+                # cfg
+                noise_pred_uncond, noise_prediction_text = noise_pred.chunk(2)
+                noise_pred = noise_pred_uncond + guidance_scale * (noise_prediction_text - noise_pred_uncond)
         
         return noise_pred
 
@@ -430,7 +436,7 @@ class DiffusionInversion:
         return latent
 
     def invert(self, image: torch.Tensor, prompt: Optional[str]=None, context: Optional[torch.Tensor]=None, 
-               guidance_scale_fwd: Optional[float]=None) -> Dict[str, Any]:
+               guidance_scale_fwd: Optional[float]=None, **kwargs) -> Dict[str, Any]:
         """Invert image to inverse latent zT.
 
         Args:
@@ -448,6 +454,9 @@ class DiffusionInversion:
         latent = self.encode(image)
         fwd_result = self.diffusion_forward(latent, context, guidance_scale_fwd=guidance_scale_fwd)
         fwd_result["context"] = context  # add embedded prompts
+
+        fwd_result = {**kwargs, **fwd_result}
+
         return fwd_result
 
     def cat_context(self, contexts: List[torch.Tensor]) -> torch.Tensor:
@@ -494,6 +503,9 @@ class DiffusionInversion:
             Dict[str, Any]: Image and latent z0
         """
         
+        if inv_result is None:
+            return None
+
         latent = inv_result["latents"][-1]
 
         # create context from prompt(s) if not provided

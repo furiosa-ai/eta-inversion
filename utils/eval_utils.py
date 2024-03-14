@@ -62,7 +62,7 @@ def create_configs(cfg_all: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         cfg_all = yaml.safe_load(f)
 
     # keys for which to perform a carthesian product to create sub configs
-    keys_batch = ["data", "edit_cfg", "method", "edit_method"]
+    keys_batch = ["model", "data", "edit_cfg", "method", "edit_method"]
 
     # product
     vals_batch = list(product(*[cfg_all.get(k, [None]) for k in keys_batch]))
@@ -91,7 +91,7 @@ class EditResultData:
 
     def __init__(self, data_name: str, method: Dict[str, Any], edit_method: Dict[str, Any], 
                  edit_cfg: Dict[str, Any]=None, exp_name: Optional[str]=None, path: Optional[str]=None, 
-                 skip_existing=False, **kwargs) -> None:
+                 skip_existing=False, model=None, **kwargs) -> None:
         """Initialies a new dataset for evaluation.
 
         Args:
@@ -112,6 +112,7 @@ class EditResultData:
         self.metrics = {}
         self.exp_name = exp_name
         self.edit_cfg = edit_cfg
+        self.model = model
         self.skip_existing = skip_existing
 
     @staticmethod
@@ -126,11 +127,18 @@ class EditResultData:
         """
 
         dic = {**dic}
-        dic["data_name"] = dic.pop("data")
-        return EditResultData(**dic, **kwargs)
+        data = dic.pop("data")
+
+        if not isinstance(data, dict):
+            data = {"type": data}
+
+        dic["data_name"] = data.pop("type")
+        data_cfg = data
+
+        return EditResultData(**dic, **kwargs, **data_cfg)
 
     @staticmethod
-    def from_metrics(eval_dir: str, categories: Optional[Dict[str, List[int]]]=None, **kwargs) -> "EditResultData":
+    def from_metrics(eval_dir: str, categories: Optional[Dict[str, List[int]]]=None, metric_filter=None, **kwargs) -> "EditResultData":
         """Create a result dataset and load metrics
 
         Args:
@@ -143,7 +151,7 @@ class EditResultData:
 
         # get config and metric yaml files
         cfg_file = Path(eval_dir) / "cfg.yaml"
-        metric_files = (Path(eval_dir) / "metrics").glob("*.yaml")
+        metric_files = sorted((Path(eval_dir) / "metrics").glob("*.yaml"))
 
         with open(cfg_file, "r") as f:
             cfg = yaml.safe_load(f)
@@ -156,15 +164,28 @@ class EditResultData:
 
         metrics = {}
 
+        # print(list(metric_files))
         # load metrics
         for metric_file in metric_files:
+            if metric_filter is not None and Path(metric_file).stem not in metric_filter:
+                continue
+
+            if metric_file.stem.endswith("_bak"):
+                continue
+
             with open(metric_file, "r") as f:
                 metric_data = yaml.safe_load(f)
+
+            assert metric_data is not None, metric_file
 
             if categories is None:
                 metrics_total = {"mean": metric_data["mean"]}
             else:
-                values = np.array([r["value"] for r in metric_data["results"]]).astype(float)
+                try:
+                    values = np.array([r["value"] for r in metric_data["results"]]).astype(float)
+                except:
+                    print(f"skipping {metric_file}")
+                    continue
                 # recompute per category mean
                 metrics_total = {"mean": {name: np.mean(values[ind]) if len(values) > 0 else None for name, ind in categories.items()}}
 

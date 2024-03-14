@@ -1,6 +1,7 @@
 import time
 from tqdm import tqdm
 
+from modules.editing.ptp_editor import PromptToPromptControllerAttentionStore
 from utils.utils import log_delta
 from .diffusion_inversion import DiffusionInversion
 import torch.nn.functional as F
@@ -12,22 +13,64 @@ import numpy as np
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
 from typing import Dict, List, Optional, Union, Any, Tuple
 from itertools import product
+import torchvision
+
+
+import os
+os.system("rm -rf result/pie_eta_new/*")
+
+
+class EtaTensor(torch.Tensor):
+    # Hack to avoid exception in DDIM scheduler in eta > 0 condition
+
+    def __init__(self, eta):
+        self.eta = eta
+
+    def __mul__(self, other: Any) -> Tensor:
+        return self.eta * other
+
+    def __gt__(self, other: Any) -> Tensor:
+        return True
+
+
+class ControllerAttentionStorePerStep(PromptToPromptControllerAttentionStore):
+    def __init__(self, model: StableDiffusionPipeline, prompt, res, from_where, callback) -> None:
+        super().__init__(model, max_size=res)
+        self.callback = callback
+        self.prompt = prompt
+        self.res = res
+        self.from_where = from_where
+
+    def end_step(self, latent: torch.Tensor, noise_pred: Optional[torch.Tensor]=None, t: Optional[int]=None) -> torch.Tensor:
+        # attn_map = self.get_attention_map("a cat sitting next to a mirror", "cat", resize=64)  # 1 64 64
+        attn_maps = [self.get_attention_map(self.prompt, word, from_where=self.from_where, res=self.res, resize=64) for word in self.prompt.split(" ")]
+        self.callback(attn_maps, t)
+
+        return super().end_step(latent, noise_pred, t)
+
+
+def _create_eta_func_pow(p1, p2, p=1):
+    (x1, y1), (x2, y2) = p1, p2
+    a = ((y2 - y1) / (x2 - x1) ** p)
+    f_str = f"{a} * (t - {x1}) ** {p} + {y1}"
+    f = eval("lambda t: " + f_str.replace("t", f"np.clip(t, {x1}, {x2})"))
+
+    return f, f_str
 
 
 class EtaInversion(DiffusionInversion):
-    """Main class for eta inversion.
-    """
+    noise_sampler = None
 
     def __init__(self, model: StableDiffusionPipeline, scheduler: Optional[str]=None, num_inference_steps: Optional[int]=None, 
                  guidance_scale_bwd: Optional[float]=None, guidance_scale_fwd: Optional[float]=None,
                  verbose: bool=False, eta=(0.0, 0.4), noise_sample_count: int=10, seed: int=0, 
-                 eta_start: Optional[float]=None, eta_end: Optional[float]=None, eta_zero_at: Optional[float]=None) -> None:
+                 eta_start: Optional[float]=None, eta_end: Optional[float]=None, use_mask=True, mask_mode_cfg=None) -> None:
         """Creates a new eta inversion instance.
 
         Args:
             model (StableDiffusionPipeline): The diffusion model to invert. Must be Stable Diffusion for now.
             scheduler (Optional[str], optional): Name of the scheduler to invert. 
-            Possbile choices are "ddim", "dpm" and "ddpm". Defaults to "ddim".
+            Possibe choices are "ddim", "dpm" and "ddpm". Defaults to "ddim".
             num_inference_steps (Optional[int], optional): Number of denoising steps. Usually set to 50. Defaults to None.
             guidance_scale_bwd (Optional[float], optional): Classifier-free guidance scale for backward process (denoising). Defaults to None.
             guidance_scale_fwd (Optional[float], optional): Classifier-free guidance scale for forward process (inversion). Defaults to None.
@@ -41,6 +84,26 @@ class EtaInversion(DiffusionInversion):
             Must be between 0 (Eta unchanged) and 1 (Eta always zero). Defaults to None.
         """
 
+        if use_mask:
+            mask_mode_cfg_dft = dict(
+                attn_from_where=["up", "down"],
+                attn_res=16,
+                mask_dirinv=None,
+                mask_eta="fwd_mean",
+                pow=None,
+                target_dirinv=None,
+                thres=0.2,
+            )
+
+            if mask_mode_cfg is None:
+                mask_mode_cfg = {}
+
+            mask_mode_cfg = {**mask_mode_cfg_dft, **mask_mode_cfg}
+        else:
+            mask_mode_cfg = None
+
+        self.mask_mode_cfg = mask_mode_cfg
+
         num_train_steps = 1000  # train steps for diffusion model
 
         if isinstance(guidance_scale_fwd, (tuple, list)):
@@ -51,22 +114,30 @@ class EtaInversion(DiffusionInversion):
 
         if eta_start is not None:
             # for gradio
-            # override eta
             assert eta_end is not None
             eta = (eta_start, eta_end)
             print(eta, noise_sample_count, seed)
-            
+
         if not isinstance(eta, (tuple, list)):
             eta = eta, eta
 
-        # create all etas for all training steps
-        etas = np.linspace(eta[0], eta[1], num_train_steps)
-
-        # zero out etas
-        if eta_zero_at is not None:
-            etas[:int(eta_zero_at * num_train_steps)] = 0
+        num_train_steps = 1000
+        if len(eta) == 3:
+            f, f_str = _create_eta_func_pow(*eta)
+            ts = np.linspace(0, 1, num_train_steps)
+            etas = f(ts)
+        else:
+            if isinstance(eta[0], (tuple, list)):
+                f, f_str = _create_eta_func_pow(*eta)
+                ts = np.linspace(0, 1, num_train_steps)
+                etas = f(ts)
+            else:
+                etas = np.linspace(eta[0], eta[1], num_train_steps)
+                
+        etas = np.clip(etas, 0, None)
 
         self.etas = etas
+        self.attn_maps_forward = {}
         self.noise_sample_count = noise_sample_count
 
         self.seed = seed if seed >= 0 else None
@@ -84,8 +155,57 @@ class EtaInversion(DiffusionInversion):
 
         return torch.randn((n, 1, 4, 64, 64), generator=generator, device=self.model.device).to(self.model.unet.dtype)
 
+
+    def get_mask(self, key, mask, t, edit_word_idx):
+        if self.mask_mode_cfg is not None:
+            res = self.mask_mode_cfg["attn_res"]
+            from_where = self.mask_mode_cfg["attn_from_where"]
+
+            if self.mask_mode_cfg[key] == "gt":
+                # mask = mask
+                pass
+            elif self.mask_mode_cfg[key] == "fwd":
+                # edit_word_idx = source idx, target_idx
+                mask = self.attn_maps_forward[t.item()][edit_word_idx[0]]
+            elif self.mask_mode_cfg[key] == "fwd_mean":
+                mask = self.attn_maps_forward["mean"][edit_word_idx[0]]
+                # if self.mask_mode_cfg["aggr"] == "mean":
+                #     mask = self.attn_maps_forward["mean"][edit_word_idx[0]]
+                # else:
+                #     mask = self.attn_maps_forward[t.item()][edit_word_idx[0]]
+            elif self.mask_mode_cfg[key] == "bwd_source":
+                mask = self.controller.get_attention_map(mask_idx=edit_word_idx[0], res=res, from_where=from_where, prompt_idx=0, num_prompts=2, resize=64) 
+            elif self.mask_mode_cfg[key] == "bwd_target":
+                mask = self.controller.get_attention_map(mask_idx=edit_word_idx[1], res=res, from_where=from_where, prompt_idx=1, num_prompts=2, resize=64) 
+            elif self.mask_mode_cfg[key] == "bwd_source_target":
+                mask_source = self.controller.get_attention_map(mask_idx=edit_word_idx[0], res=res, from_where=from_where, prompt_idx=0, num_prompts=2, resize=64) 
+                mask_target = self.controller.get_attention_map(mask_idx=edit_word_idx[1], res=res, from_where=from_where, prompt_idx=1, num_prompts=2, resize=64) 
+                mask = torch.maximum(mask_source, mask_target)
+            elif self.mask_mode_cfg[key] is None:
+                return None
+            else:
+                assert False
+
+            smooth = True
+
+            # if smooth:
+            #     smoothing = GaussianSmoothing(channels=1, kernel_size=3, sigma=0.5, dim=2).cuda()
+            #     mask = smoothing(mask)
+            # mask = torch.stack([mask] * 4, 1)
+
+            if self.mask_mode_cfg["thres"] is not None:
+                # assert not smooth
+                mask = (mask > self.mask_mode_cfg["thres"]).to(mask.dtype)
+
+            if self.mask_mode_cfg["pow"] is not None:
+                mask = torch.pow(mask, self.mask_mode_cfg["pow"])
+        else:
+            mask = None
+
+        return mask
+
     def predict_step_backward(self, latent: torch.Tensor, t: torch.Tensor, context: torch.Tensor, guidance_scale_bwd: Optional[float]=None, 
-                              source_latent_prev: Optional[torch.Tensor]=None, generator: Optional[torch.Generator]=None) -> Tuple[torch.Tensor, torch.Tensor]:
+                              source_latent_prev=None, generator=None, mask=None, edit_word_idx=None) -> Tuple[torch.Tensor, torch.Tensor]:
         """Perform one backward diffusion steps. Makes a noise prediction using SD's UNet first and then updates the latent using the noise scheduler.
 
         Args:
@@ -111,11 +231,40 @@ class EtaInversion(DiffusionInversion):
         # get best eta and variance noise
         eta_res = self.get_eta_variance_noise(source_latent_prev, latent[:1], t, noise_pred[:1], generator)
 
+        # eta_res = self.compute_best_eta(source_latent_prev, latent[:1], t, noise_pred[:1], generator, mask=None)
+        variance_noise = eta_res["variance_noise"]
+        eta = torch.full_like(variance_noise, eta_res["eta"])
+
+        if self.mask_mode_cfg is not None:
+            mask_eta = self.get_mask("mask_eta", mask, t, edit_word_idx)
+            mask_dirinv = self.get_mask("mask_dirinv", mask, t, edit_word_idx)
+
+            if mask_eta is not None:
+                eta = mask_eta * eta
+
+            new_latent = self.step_backward(noise_pred, t, latent, eta=EtaTensor(eta), variance_noise=variance_noise).prev_sample
+
+            delta = eta_res["latent_prev"][:1] - new_latent[:1]
+
+            new_latent[:1] = new_latent[:1] + delta
+
+            if self.mask_mode_cfg["target_dirinv"] is not None:
+
+                if mask_dirinv is not None:
+                    delta = (1 - mask_dirinv) * delta
+
+                new_latent[1:] = new_latent[1:] + self.mask_mode_cfg["target_dirinv"] * delta
+
+            # _save_mask(t, mask)
+        else:
+            new_latent = self.step_backward(noise_pred, t, latent, eta=EtaTensor(eta), variance_noise=variance_noise).prev_sample
+            new_latent[:1] = eta_res["latent_prev"][:1]
+
         # update the latent based on the predicted noise with the noise schedulers
-        new_latent = self.step_backward(noise_pred, t, latent, eta=eta_res["eta"], variance_noise=eta_res["variance_noise"]).prev_sample
+        # new_latent = self.step_backward(noise_pred, t, latent, eta=eta_res["eta"], variance_noise=eta_res["variance_noise"]).prev_sample
 
         # direct inversion
-        new_latent[:1] += eta_res["delta"]
+        # new_latent[:1] += eta_res["delta"]
         new_latent = new_latent.clone()
 
         # call controller callback to modify latent (e.g. ptp)
@@ -126,9 +275,21 @@ class EtaInversion(DiffusionInversion):
     def diffusion_backward(self, latent: torch.Tensor, context: torch.Tensor, inv_result: Dict[str, Any]) -> torch.Tensor:
         generator = torch.Generator(device=self.model.device).manual_seed(self.seed)
 
+        inv_cfg = inv_result["inv_cfg"]
+
+        if inv_cfg is None:
+            inv_cfg = {}
+
+        mask = inv_cfg.get("mask", None)
+        edit_word_idx = inv_cfg.get("edit_word_idx", None)
+
+        if mask is not None:
+            mask = F.interpolate(mask[None, None], (64, 64), mode="bilinear")[0].to(latent.dtype).to(self.model.device)
+
         for i, t in enumerate(self.pbar(self.scheduler_bwd.timesteps, desc="backward")):
-            # pass previous latent
-            latent, noise_pred = self.predict_step_backward(latent, t, context, source_latent_prev=inv_result["latents"][-(i+2)], generator=generator)
+            # pass noise loss
+            latent, noise_pred = self.predict_step_backward(latent, t, context, source_latent_prev=inv_result["latents"][-(i+2)], 
+                                                            generator=generator, mask=mask, edit_word_idx=edit_word_idx)
             
         return latent
 
@@ -212,3 +373,32 @@ class EtaInversion(DiffusionInversion):
         delta = latent_prev - latent_prev_rec
 
         return {"eta": eta, "variance_noise": variance_noise, "delta": delta, "latent_prev": latent_prev, "latent_prev_rec": latent_prev_rec, "loss": loss}
+
+
+    def invert(self, image: torch.Tensor, prompt: Optional[str]=None, context: Optional[torch.Tensor]=None, 
+               guidance_scale_fwd: Optional[float]=None, inv_cfg: Optional[Dict[str, Any]]=None,) -> Dict[str, Any]:
+        # generator = torch.Generator(device=self.model.device).manual_seed(0)
+
+        if self.mask_mode_cfg is None:
+            fwd_result = super().invert(image, prompt, context, guidance_scale_fwd, inv_cfg=inv_cfg)
+        else:
+            if inv_cfg["edit_word_idx"][0] is None or inv_cfg["edit_word_idx"][1] is None:
+                return None
+
+            self.attn_maps_forward = {}  # clear old maps
+            with self.use_controller(ControllerAttentionStorePerStep(self.model, prompt, res=self.mask_mode_cfg["attn_res"], from_where=self.mask_mode_cfg["attn_from_where"], callback=(lambda attn, t: self.attn_maps_forward.update({t.item(): attn})))):
+                fwd_result = super().invert(image, prompt, context, guidance_scale_fwd, inv_cfg=inv_cfg)
+        
+        if self.mask_mode_cfg is not None:
+            attn_maps_lst = list(self.attn_maps_forward.values())
+            num_words = len(attn_maps_lst[0])
+
+            self.attn_maps_forward["mean"] = [torch.mean(torch.stack([a[word_idx] for a in attn_maps_lst]), dim=0) for word_idx in range(num_words)]
+
+        # with self.use_controller(ControllerAttentionStorePerStep(self.model, (lambda attn, t: self.attn_maps_forward.update({t.item(): attn})))):
+        # fwd_result = super().invert(image, prompt, context, guidance_scale_fwd, inv_cfg=inv_cfg)
+
+        # ddim_latents = fwd_result["latents"]
+        # eta_list = self.compute_eta_variance_all(ddim_latents, context, self.guidance_scale_bwd, generator)
+
+        return fwd_result

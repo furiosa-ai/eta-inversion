@@ -59,7 +59,7 @@ def get_edit_word(source_prompt: str, target_prompt: str) -> Tuple[str, str]:
 
 
 @torch.no_grad()
-def main(input: str, model: str, src_prompt: str, target_prompt: str, output: str, inv_method: str, edit_method: str, 
+def main(input: str, model: str, source_prompt: str, target_prompt: str, output: str, inv_method: str, edit_method: str, 
          scheduler: str, steps: int, guidance_scale_bwd: float, guidance_scale_fwd: float, edit_cfg: str, prec: str) -> None:
     enable_deterministic()
 
@@ -78,7 +78,7 @@ def main(input: str, model: str, src_prompt: str, target_prompt: str, output: st
         # Using a default config for prompt-to-prompt if no edit_cfg yaml is specified
         if edit_method in ("ptp", "etaedit"):
             # Get blend word
-            blended_word = get_edit_word(src_prompt, target_prompt)
+            blended_word = get_edit_word(source_prompt, target_prompt)
 
             if blended_word is None:
                 print("Provide a edit_cfg for prompt-to-prompt if source and target prompt differ in more than one word.")
@@ -86,7 +86,7 @@ def main(input: str, model: str, src_prompt: str, target_prompt: str, output: st
 
             edit_cfg = dict(
                 is_replace_controller=False,
-                prompts = [src_prompt, target_prompt],
+                prompts = [source_prompt, target_prompt],
                 cross_replace_steps={'default_': .4,},
                 self_replace_steps=0.6,
                 blend_words=(((blended_word[0], ),
@@ -107,8 +107,11 @@ def main(input: str, model: str, src_prompt: str, target_prompt: str, output: st
 
     image = preproc(input)  # load and preprocess image
 
+    edit_word_idx_src = next((i for i, (s, t) in enumerate(zip(source_prompt.split(" "), target_prompt.split(" "))) if s != t), None)
+    inv_cfg = dict(edit_word_idx=(edit_word_idx_src, edit_word_idx_src))
+
     t1 = time.time()
-    edit_res = editor.edit(image, src_prompt, target_prompt, cfg=edit_cfg)  # edit image
+    edit_res = editor.edit(image, source_prompt, target_prompt, cfg=edit_cfg, inv_cfg=inv_cfg)  # edit image
     t2 = time.time()
 
     img_edit = postproc(edit_res["image"])  # postprocess output
@@ -131,7 +134,7 @@ def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, description="Edits a single image.")
     parser.add_argument("--input", required=True, help="Path to image to invert.")
     parser.add_argument("--model", default="CompVis/stable-diffusion-v1-4", help="Diffusion Model.")
-    parser.add_argument("--src_prompt", required=True, help="Prompt to use for inversion.")
+    parser.add_argument("--source_prompt", required=True, help="Prompt to use for inversion.")
     parser.add_argument("--target_prompt", required=True, help="Prompt to use for inversion.")
     parser.add_argument("--output", help="Path for output image.")
     add_argparse_arg(parser, "--inv_method")

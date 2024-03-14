@@ -13,7 +13,7 @@ class MasactrlEditor(Editor):
     """MasaControl editor
     """
 
-    def __init__(self, inverter: DiffusionInversion, no_null_source_prompt: bool=False, step: int=4, layer: int=10) -> None:
+    def __init__(self, inverter: DiffusionInversion, no_null_source_prompt: bool=True, step: int=4, layer: int=10) -> None:
         """Initiates a new editor object
 
         Args:
@@ -41,20 +41,26 @@ class MasactrlEditor(Editor):
         yield
         register_attention_editor_diffusers(self.model, None)
 
-    def edit(self, image: Tensor, source_prompt: str, target_prompt: str, cfg: Optional[Dict[str, Any]]=None) -> Dict[str, Any]:
+    def edit(self, image: Tensor, source_prompt: str, target_prompt: str, cfg: Optional[Dict[str, Any]]=None, inv_cfg=None,) -> Dict[str, Any]:
         assert cfg is None, f"{cfg}"
+
+        if inv_cfg is None:
+            inv_cfg = {}
 
         # create context from prompts
         src_context = self.inverter.create_context("" if not self.no_null_source_prompt else source_prompt)
         target_context = self.inverter.create_context(target_prompt)
 
         # diffusion inversion with the source prompt to obtain inverse latent zT
-        inv_res = self.inverter.invert(image, context=src_context)
+        inv_res = self.inverter.invert(image, context=src_context, prompt=source_prompt, inv_cfg=inv_cfg)
 
         # apply masactrl hooks
         with self.register_editor():
             edit_res = self.inverter.sample(inv_res, context=[src_context, target_context])
         
+        if edit_res is None:
+            return None
+
         return {
             "image_inv": edit_res["image"][0:1],  # Image from inversion
             "image": edit_res["image"][1:2],   # Edited image

@@ -256,6 +256,9 @@ class Demo:
                             self.inputs[f"{k}.seed"] = gr.Number(
                                 label="Seed", value=0, precision=0, 
                                 info="Use -1 for random seed.")
+                            
+                            self.inputs[f"{k}.use_mask"] = gr.Checkbox(
+                                label="Mask", value=False)
 
 
     def build_edit(self) -> None:

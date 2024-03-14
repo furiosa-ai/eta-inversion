@@ -24,14 +24,14 @@ class SimpleEditor(Editor):
         self.model = self.inverter.model
         self.no_source_backward = no_source_backward
 
-    def edit(self, image: Tensor, source_prompt: str, target_prompt: str, cfg: Optional[Dict[str, Any]]=None) -> Dict[str, Any]:
+    def edit(self, image: Tensor, source_prompt: str, target_prompt: str, cfg: Optional[Dict[str, Any]]=None, inv_cfg=None) -> Dict[str, Any]:
         assert cfg is None
 
         src_context = self.inverter.create_context(source_prompt)
         target_context = self.inverter.create_context(target_prompt)
 
         # self.inverter.guidance_scale_bwd
-        inv_res = self.inverter.invert(image, context=src_context, guidance_scale_fwd=1)
+        inv_res = self.inverter.invert(image, prompt=source_prompt, context=src_context, guidance_scale_fwd=1, inv_cfg=inv_cfg)
 
         if not self.no_source_backward:
             edit_res = self.inverter.sample(inv_res, context=[src_context, target_context])

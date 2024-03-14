@@ -23,7 +23,7 @@ class NegativePromptInversion(DiffusionInversion):
         return latent
     
     def invert(self, image: torch.Tensor, prompt: Optional[str]=None, context: Optional[torch.Tensor]=None, 
-               guidance_scale_fwd: Optional[float]=None) -> Dict[str, Any]:
+               guidance_scale_fwd: Optional[float]=None, inv_cfg=None) -> Dict[str, Any]:
         fwd_result = super().invert(image, prompt, context, guidance_scale_fwd)
 
         uncond_embeddings, cond_embeddings = fwd_result["context"].chunk(2)  # use conditional embeddings as null embeddings

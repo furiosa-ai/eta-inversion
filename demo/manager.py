@@ -162,9 +162,13 @@ class EditorManager:
             self.editor = load_editor(inverter=self.inverter, **cfg["editor"])
 
         # editing
+        edit_word_idx_src = next((i for i, (s, t) in enumerate(zip(source_prompt.split(" "), target_prompt.split(" "))) if s != t), None)
+        inv_cfg = dict(edit_word_idx=(edit_word_idx_src, edit_word_idx_src))
+        print(edit_word_idx_src)
+
         enable_deterministic()
         image = self.preproc(source_image)
-        edit_res = self.editor.edit(image, source_prompt, target_prompt)
+        edit_res = self.editor.edit(image, source_prompt, target_prompt, inv_cfg=inv_cfg)
         img_edit = self.postproc(edit_res["image"])
 
         self.cfg = cfg

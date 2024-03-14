@@ -13,7 +13,7 @@ class PlugAndPlayEditor(Editor):
     """Plug-and-play editor
     """
 
-    def __init__(self, inverter: DiffusionInversion, no_null_source_prompt: bool=False) -> None:
+    def __init__(self, inverter: DiffusionInversion, no_null_source_prompt: bool=True) -> None:
         """Initiates a new editor object
 
         Args:
@@ -41,15 +41,18 @@ class PlugAndPlayEditor(Editor):
         yield
         unregister_pnp(self.model)
 
-    def edit(self, image: Tensor, source_prompt: str, target_prompt: str, cfg: Optional[Dict[str, Any]]=None) -> Dict[str, Any]:
+    def edit(self, image: Tensor, source_prompt: str, target_prompt: str, cfg: Optional[Dict[str, Any]]=None, inv_cfg=None,) -> Dict[str, Any]:
         assert cfg is None
+
+        if inv_cfg is None:
+            inv_cfg = {}
 
         # create context from prompts
         src_context = self.inverter.create_context("" if not self.no_null_source_prompt else source_prompt)
         target_context = self.inverter.create_context(target_prompt)
 
         # diffusion inversion with the source prompt to obtain inverse latent zT and intermediate latents
-        inv_res = self.inverter.invert(image, context=src_context)
+        inv_res = self.inverter.invert(image, prompt=source_prompt, context=src_context, inv_cfg=inv_cfg)
 
         with self.register_editor():
             if self.negative_prompt is not None and self.negative_prompt != "":

@@ -27,7 +27,7 @@ class PieBenchData(DatasetBase):
     """Class for PIE (DirectInversion) dataset. Refer to https://github.com/cure-lab/DirectInversion
     """
 
-    def __init__(self, data_path: str="data/eval/PIE-Bench_v1", skip_img_load: bool=False, limit: int=None) -> None:
+    def __init__(self, data_path: str="data/eval/PIE-Bench_v1", skip_img_load: bool=False, limit: int=None, categories=None) -> None:
         """Instantiate a new PIE dataset.
 
         Args:
@@ -81,6 +81,10 @@ class PieBenchData(DatasetBase):
                 mask=mask,
             ))
         
+        if categories is not None:
+            ind = sum([list(PieBenchData.categories[cat]) for cat in categories], [])
+            labels = [labels[i] for i in ind]
+
         self.edit_prompts = labels
         self.skip_img_load = skip_img_load
         self.limit = limit
@@ -121,10 +125,34 @@ class PieBenchData(DatasetBase):
         image = np.array(Image.open(edit_prompt["image_file"]))[:, :, :3] if not self.skip_img_load else None
         mask = self.mask_decode(edit_prompt["mask"])
 
+        if edit_prompt["edit"]["ptp"]["blend_words"] is not None:
+            edit_word_src = edit_prompt["edit"]["ptp"]["blend_words"][0][0]
+            edit_word_target = edit_prompt["edit"]["ptp"]["blend_words"][1][0]
+        else:
+            edit_word_src, edit_word_target = None, None
+
+        source_prompt = edit_prompt["edit"]["ptp"]["prompts"][0]
+        target_prompt = edit_prompt["edit"]["ptp"]["prompts"][1]
+
+        edit_word_idx = [None, None]
+
+        try:
+            edit_word_idx[0] = source_prompt.split(" ").index(edit_word_src)
+        except ValueError:
+            edit_word_src = None
+
+        try:
+            edit_word_idx[1] = target_prompt.split(" ").index(edit_word_target)
+        except ValueError:
+            edit_word_target = None
+
+        # edit_word_idx = (source_prompt.split(" ").index(edit_word_src), target_prompt.split(" ").index(edit_word_target))
+        
         out = {
             **copy.deepcopy(edit_prompt),
             "image": image,
-            "mask": mask
+            "mask": mask,
+            "edit_word_idx": edit_word_idx,
         }
 
         return out

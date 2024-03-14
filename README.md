@@ -32,14 +32,14 @@ To edit a single image, use `edit_image.py`.
 
 ```bash
 python edit_image.py --help
-usage: edit_image.py [-h] --input INPUT --src_prompt SRC_PROMPT --target_prompt TARGET_PROMPT [--output OUTPUT] [--inv_method INV_METHOD] [--edit_method EDIT_METHOD] [--edit_cfg EDIT_CFG] [--scheduler {ddim,ddpm,dpm}] [--steps STEPS] [--guidance_scale_bwd GUIDANCE_SCALE_BWD] [--guidance_scale_fwd GUIDANCE_SCALE_FWD]
+usage: edit_image.py [-h] --input INPUT --source_prompt SOURCE_PROMPT --target_prompt TARGET_PROMPT [--output OUTPUT] [--inv_method INV_METHOD] [--edit_method EDIT_METHOD] [--edit_cfg EDIT_CFG] [--scheduler {ddim,ddpm,dpm}] [--steps STEPS] [--guidance_scale_bwd GUIDANCE_SCALE_BWD] [--guidance_scale_fwd GUIDANCE_SCALE_FWD]
 
 Edits a single image.
 
 optional arguments:
   -h, --help            show this help message and exit
   --input INPUT         Path to image to invert.
-  --src_prompt SRC_PROMPT
+  --source_prompt SOURCE_PROMPT
                         Prompt to use for inversion.
   --target_prompt TARGET_PROMPT
                         Prompt to use for inversion.
@@ -78,7 +78,7 @@ python edit_image.py \
   --inv_method etainv \
   --edit_method ptp \
   --input test/data/house.png \
-  --src_prompt "a house in the woods" \
+  --source_prompt "a house in the woods" \
   --target_prompt "a monster in the woods" \
   --output out.png
 ```

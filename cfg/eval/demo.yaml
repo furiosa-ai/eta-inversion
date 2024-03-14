@@ -1,5 +1,7 @@
 data:
 - pie_test3  # full pie dataset has 700 images -> do only 3 images for faster testing
+model:
+- type: sd14
 edit_method:
 - type: ptp
 method:
@@ -9,5 +11,5 @@ method:
   scheduler: ddim
 - type: etainv
   scheduler: ddim
-  eta: [0.0, 0.4]
+  eta: [[0.6, 0], [1, 0.7]]
   noise_sample_count: 10

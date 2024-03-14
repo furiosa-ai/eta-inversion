@@ -148,9 +148,13 @@ class AttentionStore(AttentionControl):
                 "down_self": [],  "mid_self": [],  "up_self": []}
 
     def forward(self, attn: torch.Tensor, is_cross: bool, place_in_unet: str) -> torch.Tensor:
+        # print(is_cross, attn.shape)
         key = f"{place_in_unet}_{'cross' if is_cross else 'self'}"
         if attn.shape[1] <= 32 ** 2:  # avoid memory overhead
+        # if attn.shape[1] <= 64 ** 2:
             self.step_store[key].append(attn)
+        elif attn.shape[1] <= self.max_size ** 2:
+            self.step_store[key].append(attn.to(torch.float16))
         return attn
 
     def between_steps(self) -> None:
@@ -172,10 +176,11 @@ class AttentionStore(AttentionControl):
         self.step_store = self.get_empty_store()
         self.attention_store = {}
 
-    def __init__(self) -> None:
+    def __init__(self, max_size=32) -> None:
         super(AttentionStore, self).__init__()
         self.step_store = self.get_empty_store()
         self.attention_store = {}
+        self.max_size = max_size
 
         
 class AttentionControlEdit(AttentionStore, abc.ABC):
@@ -284,6 +289,10 @@ def aggregate_attention(prompts, attention_store: AttentionStore, res: int, from
     out = []
     attention_maps = attention_store.get_average_attention()
     num_pixels = res ** 2
+
+    if res == 8:
+        from_where = ["mid"]
+
     for location in from_where:
         for item in attention_maps[f"{location}_{'cross' if is_cross else 'self'}"]:
             if item.shape[1] == num_pixels:

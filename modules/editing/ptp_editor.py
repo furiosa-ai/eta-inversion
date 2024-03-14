@@ -37,9 +37,10 @@ class PromptToPromptControllerBase(ControllerBase):
 
     def end(self) -> None:
         # for debugging
-        assert self.step_idx > 0, "Controller begin_step/end_step was not called"
+        # assert self.step_idx > 0, "Controller begin_step/end_step was not called"
+        pass
 
-    def get_attention_map(self, prompt: str, word: str, res: int=16, from_where: List[str]=("up", "down"), resize: Optional[int]=None, prompt_idx: int=0) -> torch.Tensor:
+    def get_attention_map(self, prompt: str=None, word: str=None, res: int=16, from_where: List[str]=("up", "down"), resize: Optional[int]=None, prompt_idx=None, num_prompts=None, mask_idx=None) -> torch.Tensor:
         """Retrieve stored attention map for a specific word
 
         Args:
@@ -54,20 +55,31 @@ class PromptToPromptControllerBase(ControllerBase):
             torch.Tensor: Attention map tensor
         """
 
-        attention_maps = ptp.aggregate_attention([None], self.controller, res, from_where, True, 0)
-        h = 8  # only get source attention map
-        attention_maps = attention_maps[h*(prompt_idx):h*(prompt_idx+1)]
+        if prompt_idx is None:
+            assert num_prompts is None
+            prompt_idx = 0
+            num_prompts = 1
+        else:
+            assert num_prompts is not None
 
-        try:
-            mask_idx = prompt.split(' ').index(word) + 1 # +1 for start token
-        except ValueError:
-            raise Exception(f"Cannot get attention map. Word {word} not in {prompt}")
+        attention_maps = ptp.aggregate_attention([None] * num_prompts, self.controller, res, from_where, True, select=prompt_idx)
+        # h = 8  # only get source attention map
+        # attention_maps = attention_maps[8:]
+        # attention_maps = attention_maps[h*(prompt_idx):h*(prompt_idx+1)]
+
+        if mask_idx is None:
+            try:
+                mask_idx = prompt.split(' ').index(word) + 1 # +1 for start token
+            except ValueError:
+                raise Exception(f"Cannot get attention map. Word {word} not in {prompt}")
+        else:
+            mask_idx = mask_idx + 1
 
         attention_map = attention_maps[:, :, mask_idx]
         attention_map = attention_map[None]
         attention_map = attention_map / attention_map.max()
 
-        if resize is not None:
+        if resize is not None and attention_map.shape[-2:] != (resize, resize):
             attention_map = F.interpolate(attention_map[None], (resize, resize), mode="bicubic")[0].clamp(0, 1)
 
         return attention_map
@@ -122,7 +134,7 @@ class PromptToPromptControllerAttentionStore(PromptToPromptControllerBase):
     Used by NS-LPIPS to compute object mask
     """
 
-    def __init__(self, model: StableDiffusionPipeline) -> None:
+    def __init__(self, model: StableDiffusionPipeline, max_size=32) -> None:
         """Initiates a new prompt-to-prompt controller
 
         Args:
@@ -130,7 +142,7 @@ class PromptToPromptControllerAttentionStore(PromptToPromptControllerBase):
         """
 
         # use ptp's attention store
-        super().__init__(model, ptp.AttentionStore())
+        super().__init__(model, ptp.AttentionStore(max_size=max_size))
 
 
 class PromptToPromptEditor(ControllerBasedEditor):
