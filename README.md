@@ -86,7 +86,7 @@ optional arguments:
   --prec {fp16,fp32}    Precision for diffusion.
 ```
 
-E.g., for plug-and-play editing using simple ddim inversion of `test/data/gnochi_mirror_sq.png` with prompt `"a cat->tiger sitting next to a mirror"`, run
+E.g., for prompt-to-prompt editing using Eta Inversion of `test/data/house.png` with prompt `"a house->monster in the woods"`, run
 ```bash
 python edit_image.py \
   --inv_method etainv \
