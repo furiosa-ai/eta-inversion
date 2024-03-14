@@ -10,3 +10,4 @@ build
 *.pt
 *.jpg
 bak/
+!docs/images/teaser.jpg
