@@ -4,9 +4,15 @@
       <a href="https://scholar.google.com/citations?user=Q-ARWkwAAAAJ&hl=eh" target="_blank">Wonjun Kang</a><sup>*</sup>, <a href="https://scholar.google.com/citations?user=G1EpeWYAAAAJ&hl=en" target="_blank">Kevin Galim</a><sup>*</sup>, <a href="http://cvml.ajou.ac.kr/wiki/index.php/Professor" target="_blank">Hyung Il Koo</a>
   </p>
   <p>
-    <a href="https://furiosa.ai/" target="_blank">FuriosaAI
+    <a href="https://furiosa.ai/" target="_blank">FuriosaAI</a>
    </p>
     </h4>
+
+![teaser](docs/images/teaser.jpg)
+
+## Updates
+
+* [03/15/24] Code released.
 
 ## Usage
 
@@ -149,3 +155,5 @@ python compute_metrics.py --cfg cfg/eval/demo.yaml
 ```
 
 Finally you can visualize the computed metrics with [notebooks/visualize_results.ipynb](notebooks/visualize_results.ipynb). Please see the notebook for further details. 
+
+## Citation
