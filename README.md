@@ -1,4 +1,12 @@
-# diffusion-inversion-editing-benchmark
+<h1 align="center"> <p>Eta Inversion: Designing an Optimal Eta Function <br> for Diffusion-based Real Image Editing</p></h1>
+<h4 align="center">
+    <p>
+      <a href="https://scholar.google.com/citations?user=Q-ARWkwAAAAJ&hl=eh" target="_blank">Wonjun Kang</a><sup>*</sup>, <a href="https://scholar.google.com/citations?user=G1EpeWYAAAAJ&hl=en" target="_blank">Kevin Galim</a><sup>*</sup>, <a href="http://cvml.ajou.ac.kr/wiki/index.php/Professor" target="_blank">Hyung Il Koo</a>
+  </p>
+  <p>
+    <a href="https://furiosa.ai/" target="_blank">FuriosaAI
+   </p>
+    </h4>
 
 ## Usage
 
