@@ -8,6 +8,14 @@
    </p>
     </h4>
 
+<p align="center">
+    <a href="https://arxiv.org/abs/2403.09468">
+        <img alt="GitHub release" src="https://img.shields.io/badge/arXiv-2403.09468-b31b1b.svg">
+    </a>
+</p>
+
+**Paper Link**: https://arxiv.org/abs/2403.09468
+
 ![teaser](docs/images/teaser.jpg)
 
 ## Updates
