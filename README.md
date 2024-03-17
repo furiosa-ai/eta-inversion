@@ -165,3 +165,11 @@ python compute_metrics.py --cfg cfg/eval/demo.yaml
 Finally you can visualize the computed metrics with [notebooks/visualize_results.ipynb](notebooks/visualize_results.ipynb). Please see the notebook for further details. 
 
 ## Citation
+```tex
+@article{kang2024eta,
+  title={Eta Inversion: Designing an Optimal Eta Function for Diffusion-based Real Image Editing},
+  author={Kang, Wonjun and Galim, Kevin and Koo, Hyung Il},
+  journal={arXiv preprint arXiv:2403.09468},
+  year={2024}
+}
+```
