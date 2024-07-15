@@ -1,4 +1,4 @@
-<h1 align="center"> <p>[ECCV 2024] Eta Inversion: Designing an Optimal Eta Function <br> for Diffusion-based Real Image Editing</p></h1>
+<h1 align="center"> <p>[ECCV 2024] Eta Inversion: Designing an Optimal Eta Function for Diffusion-based Real Image Editing</p></h1>
 <h4 align="center">
     <p>
       <a href="https://scholar.google.com/citations?user=Q-ARWkwAAAAJ&hl=eh" target="_blank">Wonjun Kang</a><sup>*</sup>, <a href="https://scholar.google.com/citations?user=G1EpeWYAAAAJ&hl=en" target="_blank">Kevin Galim</a><sup>*</sup>, <a href="http://cvml.ajou.ac.kr/wiki/index.php/Professor" target="_blank">Hyung Il Koo</a>
