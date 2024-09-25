@@ -14,7 +14,10 @@
     </a>
 </p>
 
+
 **Paper Link**: https://arxiv.org/abs/2403.09468
+
+**Video**: [YouTube](https://www.youtube.com/watch?v=NwqK9p4GKlo)
 
 ![teaser](docs/images/teaser.jpg)
 
