@@ -169,10 +169,12 @@ Finally you can visualize the computed metrics with [notebooks/visualize_results
 
 ## Citation
 ```tex
-@article{kang2024eta,
-  title={Eta Inversion: Designing an Optimal Eta Function for Diffusion-based Real Image Editing},
+@inproceedings{kang2024eta,
+  title={Eta inversion: Designing an optimal eta function for diffusion-based real image editing},
   author={Kang, Wonjun and Galim, Kevin and Koo, Hyung Il},
-  journal={arXiv preprint arXiv:2403.09468},
-  year={2024}
+  booktitle={European Conference on Computer Vision},
+  pages={90--106},
+  year={2024},
+  organization={Springer}
 }
 ```
